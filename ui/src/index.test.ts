@@ -4,7 +4,7 @@ import type { LobsterWorkflowsResult, LobsterWorkflowFileResult } from "../workf
 import { createViewFixture, mockSource } from "./index.test-support.js";
 
 describe("Lobster workflow page", () => {
-	it("paginates search results and keeps a valid page after filesystem updates", async () => {
+	it("loads more matching workflows and preserves the visible limit across file changes", async () => {
 		const fixture = await createViewFixture();
 		const workflows: LobsterWorkflowsResult["workflows"] = Array.from({ length: 41 }, (_, i) => ({
 			id: `file:${i + 1}`,
@@ -15,52 +15,47 @@ describe("Lobster workflow page", () => {
 		fixture.request.mockResolvedValueOnce({ workflows });
 		fixture.mount();
 		await Promise.resolve();
-		const previous = fixture.container.querySelector<HTMLButtonElement>(
-			"nav button:first-of-type",
-		)!;
-		const next = fixture.container.querySelector<HTMLButtonElement>("nav button:last-of-type")!;
-		const count = () => fixture.container.querySelector("nav [role=status]")?.textContent;
+		const more = () => fixture.container.querySelector<HTMLButtonElement>("button");
+		const count = () => fixture.container.querySelector(".lobster-workflows__count")?.textContent;
 		const names = () =>
 			Array.from(fixture.container.querySelectorAll("li a"), (link) => link.textContent);
 		expect(names()).toHaveLength(20);
-		expect(count()).toBe("1–20 of 41");
-		expect(previous.disabled).toBe(true);
-		next.click();
-		expect(count()).toBe("21–40 of 41");
-		expect(names()[0]).toContain("Workflow 21");
-		next.click();
-		expect(count()).toBe("41–41 of 41");
-		expect(names()).toHaveLength(1);
-		expect(next.disabled).toBe(true);
-		previous.click();
-		expect(count()).toBe("21–40 of 41");
-
-		// Preserve the page on edits; clamp it when its rows are removed.
+		expect(count()).toBe("20 of 41");
+		expect(more()?.textContent).toBe("Load more");
+		const firstBatch = names();
+		more()!.focus();
+		more()!.click();
+		expect(document.activeElement).toBe(more());
+		expect(count()).toBe("40 of 41");
+		expect(names().slice(0, 20)).toEqual(firstBatch);
+		expect(names()).toHaveLength(40);
 		fixture.request.mockResolvedValueOnce({ workflows });
 		await act(async () => fixture.changed());
-		expect(count()).toBe("21–40 of 41");
-		next.click();
+		expect(count()).toBe("40 of 41");
+		more()!.click();
+		expect(count()).toBe("41 of 41");
+		expect(names()).toHaveLength(41);
+		expect(more()).toBeNull();
 		fixture.request.mockResolvedValueOnce({ workflows: workflows.slice(0, 40) });
 		await act(async () => fixture.changed());
-		expect(count()).toBe("21–40 of 40");
-		expect(next.disabled).toBe(true);
+		expect(count()).toBe("40 of 40");
+		expect(more()).toBeNull();
 
 		const search = fixture.container.querySelector<HTMLInputElement>('input[type="search"]')!;
 		search.value = "matches search";
 		search.dispatchEvent(new Event("input"));
-		expect(count()).toBe("1–20 of 20");
+		expect(count()).toBe("20 of 20");
 		expect(names()[0]).toContain("Workflow 21");
-		expect(previous.disabled).toBe(true);
-		expect(next.disabled).toBe(true);
+		expect(more()).toBeNull();
 		search.value = "missing";
 		search.dispatchEvent(new Event("input"));
 		expect(count()).toBe("0 of 0");
 		expect(names()).toHaveLength(0);
-		expect(previous.disabled).toBe(true);
-		expect(next.disabled).toBe(true);
+		expect(more()).toBeNull();
 		search.value = "";
 		search.dispatchEvent(new Event("input"));
-		expect(count()).toBe("1–20 of 40");
+		expect(count()).toBe("20 of 40");
+		expect(more()?.textContent).toBe("Load more");
 		expect(fixture.request).toHaveBeenCalledTimes(3);
 	});
 

@@ -67,20 +67,15 @@ export const mountWorkflows: LobsterView = (container, context) => {
 	const count = document.createElement("div");
 	count.className = "lobster-workflows__count";
 	count.setAttribute("role", "status");
-	const pagination = document.createElement("nav");
-	pagination.className = "lobster-workflows__pagination";
-	pagination.setAttribute("aria-label", "Workflow pagination");
-	pagination.hidden = true;
-	const previous = document.createElement("button");
-	const next = document.createElement("button");
-	for (const button of [previous, next]) {
-		button.type = "button";
-		button.className = "btn btn--sm";
-	}
-	previous.textContent = "Previous";
-	next.textContent = "Next";
-	pagination.append(count, previous, next);
-	panel.append(columns, status, list, pagination);
+	const footer = document.createElement("div");
+	footer.className = "lobster-workflows__footer";
+	footer.hidden = true;
+	const loadMore = document.createElement("button");
+	loadMore.type = "button";
+	loadMore.className = "btn btn--sm lobster-workflows__load-more";
+	loadMore.textContent = "Load more";
+	footer.append(count);
+	panel.append(columns, status, list, footer);
 	content.append(searchBox, panel);
 	page.append(header, content);
 	container.append(page);
@@ -88,7 +83,7 @@ export const mountWorkflows: LobsterView = (container, context) => {
 	let disposed = false;
 	let generation = 0;
 	let connected = host.connection.connected;
-	let pageIndex = 0;
+	let visibleLimit = pageSize;
 	let workflows: LobsterWorkflowsResult["workflows"] | undefined;
 	const renderList = () => {
 		if (!workflows) {
@@ -98,9 +93,7 @@ export const mountWorkflows: LobsterView = (container, context) => {
 		const matches = workflows.filter(({ name, description }) =>
 			`${name}\n${description ?? ""}`.toLocaleLowerCase().includes(query),
 		);
-		pageIndex = Math.max(0, Math.min(pageIndex, Math.ceil(matches.length / pageSize) - 1));
-		const start = pageIndex * pageSize;
-		const visible = matches.slice(start, start + pageSize);
+		const visible = matches.slice(0, visibleLimit);
 		list.replaceChildren(
 			...visible.map(({ id, name, description, source }) => {
 				const row = document.createElement("li");
@@ -146,18 +139,21 @@ export const mountWorkflows: LobsterView = (container, context) => {
 		status.hidden = visible.length > 0;
 		status.textContent =
 			workflows.length > 0 ? "No matching workflows." : "No workflows available.";
-		pagination.hidden = workflows.length === 0;
-		count.textContent = matches.length
-			? `${start + 1}–${start + visible.length} of ${matches.length}`
-			: "0 of 0";
-		previous.disabled = pageIndex === 0;
-		next.disabled = start + pageSize >= matches.length;
+		footer.hidden = workflows.length === 0;
+		count.textContent = `${visible.length} of ${matches.length}`;
+		if (visible.length < matches.length) {
+			if (loadMore.parentElement !== footer) {
+				footer.append(loadMore);
+			}
+		} else {
+			loadMore.remove();
+		}
 	};
 	const load = async () => {
 		const current = ++generation;
 		workflows = undefined;
 		list.replaceChildren();
-		pagination.hidden = true;
+		footer.hidden = true;
 		status.hidden = false;
 		status.setAttribute("role", "status");
 		if (!connected) {
@@ -189,23 +185,15 @@ export const mountWorkflows: LobsterView = (container, context) => {
 	search.addEventListener(
 		"input",
 		() => {
-			pageIndex = 0;
+			visibleLimit = pageSize;
 			renderList();
 		},
 		{ signal },
 	);
-	previous.addEventListener(
+	loadMore.addEventListener(
 		"click",
 		() => {
-			pageIndex -= 1;
-			renderList();
-		},
-		{ signal },
-	);
-	next.addEventListener(
-		"click",
-		() => {
-			pageIndex += 1;
+			visibleLimit += pageSize;
 			renderList();
 		},
 		{ signal },

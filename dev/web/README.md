@@ -1,7 +1,7 @@
 # Lobster UI development
 
 The read-only viewer lives in `ui/`; `dev/web/` hosts it for development. It
-provides workflow search and pagination (20 rows per page), React Flow graphs,
+provides workflow search and pagination (20 rows at a time), React Flow graphs,
 child-workflow dialogs, and highlighted source with a file tree. It uses the
 local engine without executing workflows or requiring OpenClaw or credentials.
 
@@ -20,8 +20,9 @@ Run from the repository root:
 Compose Watch copies `src/`, `test/`, `ui/`, and `dev/web/` into the container.
 Vite updates the UI; `tsx watch` restarts server changes. Workflow edits,
 additions, and deletions refresh the list, graph, and Code view automatically.
-Search covers the full catalog and resets to page one; file changes retain the
-current page when possible. Pagination does not change the catalog's read limits.
+The footer matches OpenClaw Automations: shown/total count and “Load more” while
+results remain. Search covers the full catalog and resets the visible limit; file
+changes preserve it. Pagination does not change the catalog's read limits.
 
 Use `./dev/web/dev rebuild` after root configuration, dependency, lockfile, or
 Docker changes. `status` and `logs` diagnose startup failures; `.watch.log`
