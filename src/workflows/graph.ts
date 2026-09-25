@@ -1,25 +1,18 @@
 import { resolveArgsTemplate } from "./expressions.js";
+import type {
+	WorkflowGraph,
+	WorkflowGraphEdge,
+	WorkflowGraphFormat,
+	WorkflowGraphNode,
+} from "./graph-types.js";
 import type { WorkflowFile, WorkflowStep } from "./types.js";
 
-export type WorkflowGraphFormat = "mermaid" | "dot" | "ascii" | "json";
-
-export type WorkflowGraphNode = {
-	id: string;
-	type: string;
-	label: string;
-	shape: "box" | "diamond";
-};
-
-export type WorkflowGraphEdge = {
-	from: string;
-	to: string;
-	label?: string;
-};
-
-export type WorkflowGraph = {
-	nodes: WorkflowGraphNode[];
-	edges: WorkflowGraphEdge[];
-};
+export type {
+	WorkflowGraph,
+	WorkflowGraphEdge,
+	WorkflowGraphFormat,
+	WorkflowGraphNode,
+} from "./graph-types.js";
 
 export type RenderWorkflowGraphParams = {
 	workflow: WorkflowFile;

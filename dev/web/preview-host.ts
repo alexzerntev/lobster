@@ -1,14 +1,11 @@
-import type {
-	LobsterPageTarget,
-	LobsterViewContext,
-} from "../../../openclaw/extensions/lobster/browser/view-context.js";
+import type { LobsterPageTarget, LobsterViewContext } from "@lobster/ui/view-context";
 import type {
 	LobsterWorkflowFileResult,
 	LobsterWorkflowFilesResult,
 	LobsterWorkflowResult,
 	LobsterWorkflowsResult,
-} from "../../../openclaw/extensions/lobster/workflow-types.js";
-import { mountDevelopmentDialog } from "./mock-dialog.js";
+} from "@lobster/ui/workflow-types";
+import { mountDevelopmentDialog } from "./dialog.js";
 
 type WorkflowTransport = {
 	list: (signal: AbortSignal) => Promise<LobsterWorkflowsResult>;
@@ -18,11 +15,11 @@ type WorkflowTransport = {
 };
 
 const messages = {
-	request: "This OpenClaw request is not supported by the development preview.",
+	request: "This request is not supported by the development preview.",
 	params:
 		"Invalid development request parameters. Select a workflow or a source file from its tree.",
-	event: "This OpenClaw event is not supported by the development preview.",
-	page: "This OpenClaw page is not supported by the development preview.",
+	event: "This event is not supported by the development preview.",
+	page: "This page is not supported by the development preview.",
 	pageParams: "Invalid development page parameters. Select a workflow from the list.",
 	disconnected: "The development server is disconnected. Check that it is running and retry.",
 };
@@ -57,8 +54,8 @@ function pageHref(target: LobsterPageTarget): string {
 }
 
 /**
- * Development-only substitute for the small OpenClaw host surface these views use.
- * Reads use the local Lobster transport; no call can fall through to a Gateway.
+ * Development adapter for Lobster views: local reads, navigation, and lifecycle.
+ * Unknown capabilities fail explicitly; there is no workflow execution transport.
  */
 export function createDevelopmentHost({
 	transport,
@@ -160,7 +157,7 @@ export function createDevelopmentHost({
 					if (!connected) throw new Error(messages.disconnected);
 					const result = await read();
 					assertActive();
-					// The SDK's caller-selected result type is retained only at this adapter boundary.
+					// The view's caller-selected result type is retained only at this adapter boundary.
 					return result as T;
 				},
 				subscribe(listener) {
@@ -172,7 +169,7 @@ export function createDevelopmentHost({
 				},
 				onEvent(event, listener) {
 					assertActive();
-					if (event !== "plugin.lobster.workflows-changed") throw new Error(messages.event);
+					if (event !== "lobster.workflows-changed") throw new Error(messages.event);
 					events.add(listener);
 					return () => {
 						events.delete(listener);
@@ -180,10 +177,10 @@ export function createDevelopmentHost({
 				},
 				redact(text) {
 					assertActive();
-					// This mock masks whole untrusted messages; it is not OpenClaw's production redactor.
+					// Mask untrusted errors before displaying them; source content has its own explicit view.
 					return safeMessages.has(text)
 						? text
-						: "Development request failed. Check the development server and workflow file. Details are hidden by the development mock.";
+						: "Development request failed. Check the development server and workflow file. Details are hidden by the preview adapter.";
 				},
 				navigation: {
 					pageHref(target) {

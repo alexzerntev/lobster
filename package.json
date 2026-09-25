@@ -44,10 +44,10 @@
 		"clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
 		"build": "pnpm clean && tsc -p tsconfig.build.json",
 		"prepack": "pnpm build",
-		"typecheck": "tsc -p tsconfig.json --noEmit && pnpm --filter @lobster/dev-web typecheck:server",
-		"format": "oxfmt --write package.json tsconfig.json tsconfig.build.json bin src test dev",
-		"format:check": "oxfmt --check package.json tsconfig.json tsconfig.build.json bin src test dev",
-		"lint": "pnpm format:check && oxlint --tsconfig tsconfig.json bin src test && pnpm --filter @lobster/dev-web lint",
+		"typecheck": "tsc -p tsconfig.json --noEmit && pnpm --filter @lobster/ui typecheck && pnpm --filter @lobster/dev-web typecheck",
+		"format": "oxfmt --write package.json tsconfig.json tsconfig.build.json bin src test dev ui",
+		"format:check": "oxfmt --check package.json tsconfig.json tsconfig.build.json bin src test dev ui",
+		"lint": "pnpm format:check && oxlint --tsconfig tsconfig.json bin src test && pnpm --filter @lobster/dev-web lint && pnpm --filter @lobster/ui lint",
 		"fmt": "pnpm format",
 		"test": "pnpm clean && tsc -p tsconfig.json && node -e \"if (!require('fs').existsSync('dist/test')) process.exit(1)\" && node --test dist/test/*.test.js && pnpm test:web",
 		"check:changed": "pnpm run test",
@@ -57,7 +57,7 @@
 		"crabbox:stop": "crabbox stop",
 		"crabbox:warmup": "crabbox warmup",
 		"dev:web": "pnpm --filter @lobster/dev-web dev",
-		"test:web": "pnpm --filter @lobster/dev-web test"
+		"test:web": "pnpm --filter @lobster/dev-web test && pnpm --filter @lobster/ui test"
 	},
 	"dependencies": {
 		"ajv": "^8.20.0",

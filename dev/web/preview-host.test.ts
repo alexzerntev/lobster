@@ -1,8 +1,8 @@
-import type { LobsterPageTarget } from "../../../openclaw/extensions/lobster/browser/view-context.js";
+import type { LobsterPageTarget } from "@lobster/ui/view-context";
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { LobsterWorkflowFileResult } from "../../../openclaw/extensions/lobster/workflow-types.js";
-import { createDevelopmentHost } from "./mock-host.js";
+import type { LobsterWorkflowFileResult } from "@lobster/ui/workflow-types";
+import { createDevelopmentHost } from "./preview-host.js";
 
 function fixture() {
 	const requests: Array<{
@@ -136,9 +136,7 @@ test("connection changes, reconnects, and file events reach live subscriptions o
 	const connections: boolean[] = [];
 	const changes: unknown[] = [];
 	const unsubscribe = view.host.subscribe(() => connections.push(view.host.connection.connected));
-	const stopEvents = view.host.onEvent("plugin.lobster.workflows-changed", (event) =>
-		changes.push(event),
-	);
+	const stopEvents = view.host.onEvent("lobster.workflows-changed", (event) => changes.push(event));
 	owner.setConnection(true);
 	owner.setConnection(true);
 	owner.emitWorkflowsChanged();
@@ -154,7 +152,7 @@ test("connection changes, reconnects, and file events reach live subscriptions o
 	assert.equal(connections.length, 3);
 	assert.equal(changes.length, 2);
 	view.host.subscribe(() => assert.fail("Aborted subscription called"));
-	view.host.onEvent("plugin.lobster.workflows-changed", () => assert.fail("Aborted event called"));
+	view.host.onEvent("lobster.workflows-changed", () => assert.fail("Aborted event called"));
 	lifetime.abort();
 	owner.setConnection(false);
 	owner.notify();
@@ -196,7 +194,7 @@ test("navigation aborts pending source reads and rejects late results, even if t
 	await assert.rejects(host.request("lobster.workflows.list"), { name: "AbortError" });
 	assert.throws(() => host.navigation.openPage({ id: "workflows" }), { name: "AbortError" });
 	assert.throws(() => host.subscribe(() => {}), { name: "AbortError" });
-	assert.throws(() => host.onEvent("plugin.lobster.workflows-changed", () => {}), {
+	assert.throws(() => host.onEvent("lobster.workflows-changed", () => {}), {
 		name: "AbortError",
 	});
 	owner.dispose();

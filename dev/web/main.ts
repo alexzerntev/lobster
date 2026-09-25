@@ -1,8 +1,6 @@
-import "./host-styles.css";
-import { mountWorkflows } from "@lobster-view/workflows";
-import { mountWorkflow } from "@lobster-view/graph";
-import type { LobsterViewContext } from "@lobster-view/view-context";
-import { createDevelopmentHost } from "./mock-host.js";
+import "@lobster/ui/theme.css";
+import { mountWorkflows, mountWorkflow, type LobsterViewContext } from "@lobster/ui";
+import { createDevelopmentHost } from "./preview-host.js";
 import "./shell.css";
 
 const app = document.querySelector<HTMLElement>("#app")!;
@@ -23,7 +21,7 @@ async function readPreview(url: string, signal: AbortSignal) {
 	return body;
 }
 
-const mock = createDevelopmentHost({
+const preview = createDevelopmentHost({
 	transport: {
 		list: (signal) => readPreview("/api/workflows", signal),
 		get: (id, signal) => readPreview(`/api/workflow?id=${encodeURIComponent(id)}`, signal),
@@ -45,7 +43,7 @@ const render = () => {
 	disposeHost?.();
 	app.replaceChildren();
 	lifetime = new AbortController();
-	const view = mock.createView(lifetime.signal);
+	const view = preview.createView(lifetime.signal);
 	disposeHost = view.dispose;
 	const detail = location.pathname === "/workflow";
 	const context: LobsterViewContext = {
@@ -56,7 +54,7 @@ const render = () => {
 	};
 	disposeView = (detail ? mountWorkflow : mountWorkflows)(app, context)?.dispose;
 };
-const notifyChanges = () => mock.emitWorkflowsChanged();
+const notifyChanges = () => preview.emitWorkflowsChanged();
 const closeEvents = () => {
 	if (!events) return;
 	events.onopen = null;
@@ -72,10 +70,10 @@ const connectEvents = () => {
 	events = current;
 	current.onopen = () => {
 		retryDelay = 500;
-		mock.setConnection(!forcedOffline);
+		preview.setConnection(!forcedOffline);
 	};
 	current.onerror = () => {
-		mock.setConnection(false);
+		preview.setConnection(false);
 		// EventSource retries dropped streams itself, but a proxy 502 during a
 		// server restart closes it permanently. Only replace that terminal state.
 		if (current.readyState !== EventSource.CLOSED || reconnect !== undefined) return;
@@ -99,7 +97,7 @@ const syncTheme = () => {
 		theme === "light" || theme === "dark" ? theme : systemTheme.matches ? "dark" : "light";
 	document.documentElement.dataset.themeMode = mode;
 	document.documentElement.dataset.theme = mode;
-	mock.notify();
+	preview.notify();
 };
 systemTheme.addEventListener("change", syncTheme);
 syncTheme();
@@ -113,7 +111,7 @@ import.meta.hot?.dispose(() => {
 	lifetime?.abort();
 	disposeView?.();
 	disposeHost?.();
-	mock.dispose();
+	preview.dispose();
 	closeEvents();
 	window.removeEventListener("popstate", render);
 	systemTheme.removeEventListener("change", syncTheme);

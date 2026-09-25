@@ -1,9 +1,9 @@
-import type { LobsterViewContext } from "../../../openclaw/extensions/lobster/browser/view-context.js";
+import type { LobsterViewContext } from "@lobster/ui/view-context";
 
 type MountDialog = LobsterViewContext["host"]["components"]["mountDialog"];
 type DialogProps = Parameters<MountDialog>[1];
 
-/** Development-only stand-in for the public host dialog; the plugin owns its content. */
+/** Native modal used by the development shell; the viewer owns its content. */
 export function mountDevelopmentDialog(
 	container: HTMLElement,
 	initial: DialogProps,
@@ -41,7 +41,7 @@ export function mountDevelopmentDialog(
 		if (props.onCancel() !== false && active) dialog.close();
 	};
 	const onCancel = (event: Event) => {
-		// Keep dismissal synchronous with the current plugin callback, including vetoes.
+		// Keep dismissal synchronous with the current viewer callback, including vetoes.
 		event.preventDefault();
 		cancel();
 	};

@@ -1,6 +1,7 @@
 packages:
-  - '.'
-  - 'dev/web'
+  - "."
+  - "dev/web"
+  - "ui"
 
 overrides:
   fast-uri: 4.1.4

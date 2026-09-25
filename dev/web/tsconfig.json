@@ -8,10 +8,7 @@
 		"strict": true,
 		"skipLibCheck": true,
 		"noEmit": true,
-		"allowImportingTsExtensions": true,
-		"paths": {
-			"@lobster-view/*": ["../../../openclaw/extensions/lobster/browser/*"]
-		}
+		"allowImportingTsExtensions": true
 	},
-	"include": ["main.ts", "mock-host.ts", "mock-host.test.ts"]
+	"include": ["main.ts", "preview-host.ts", "preview-host.test.ts", "dialog.ts"]
 }

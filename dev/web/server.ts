@@ -9,12 +9,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const uiRoot = path.resolve(
-	process.env.LOBSTER_UI_ROOT ?? path.join(root, "../../../openclaw/extensions/lobster"),
-);
-const openclawUiRoot = path.resolve(
-	process.env.LOBSTER_OPENCLAW_UI_ROOT ?? path.join(root, "../../../openclaw/ui"),
-);
+const uiRoot = path.resolve(root, "../../ui");
 const workspace = path.resolve(process.env.LOBSTER_WORKSPACE ?? path.join(root, "workspace"));
 const api = createWorkflowApi(workspace);
 const clients = new Set<ServerResponse>();
@@ -27,10 +22,6 @@ const server = await createServer({
 	publicDir: false,
 	root,
 	resolve: {
-		alias: {
-			"@lobster-view": path.join(uiRoot, "browser"),
-			"@openclaw-ui": openclawUiRoot,
-		},
 		dedupe: ["react", "react-dom"],
 	},
 	server: {
@@ -38,13 +29,7 @@ const server = await createServer({
 		port: Number(process.env.LOBSTER_WEB_PORT ?? 5180),
 		strictPort: true,
 		fs: {
-			allow: [
-				root,
-				uiRoot,
-				path.join(openclawUiRoot, "src/styles"),
-				path.join(openclawUiRoot, "src/assets/themes"),
-				path.join(openclawUiRoot, "public/fonts"),
-			],
+			allow: [root, uiRoot],
 		},
 		watch: { usePolling: true, interval: 250 },
 	},

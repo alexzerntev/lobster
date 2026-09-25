@@ -4,9 +4,6 @@ services:
     build:
       context: ../..
       dockerfile: dev/web/Dockerfile
-      additional_contexts:
-        lobster-ui: ../../../openclaw/extensions/lobster
-        openclaw-ui: ../../../openclaw/ui
     init: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -37,27 +34,10 @@ services:
           initial_sync: true
           ignore: [node_modules/, dist/, .env, .env.*, "*.log", "*.pid"]
         - action: sync
-          path: ../../../openclaw/extensions/lobster/browser
-          target: /openclaw/extensions/lobster/browser
+          path: ../../ui
+          target: /app/ui
           initial_sync: true
-          ignore: [node_modules/, "*.test.ts"]
-        - action: sync
-          path: ../../../openclaw/extensions/lobster/workflow-types.ts
-          target: /openclaw/extensions/lobster/workflow-types.ts
-          initial_sync: true
-        - action: sync
-          path: ../../../openclaw/ui/src/styles
-          target: /openclaw/ui/src/styles
-          initial_sync: true
-          ignore: ["*.test.ts"]
-        - action: sync
-          path: ../../../openclaw/ui/src/assets/themes
-          target: /openclaw/ui/src/assets/themes
-          initial_sync: true
-        - action: sync
-          path: ../../../openclaw/ui/public/fonts
-          target: /openclaw/ui/public/fonts
-          initial_sync: true
+          ignore: [node_modules/, dist/, .env, .env.*, "*.log"]
   ingress:
     build:
       context: .

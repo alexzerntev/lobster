@@ -8,35 +8,19 @@ import { renderWorkflowGraph, type WorkflowGraph } from "../../src/workflows/gra
 import { loadWorkflowFile } from "../../src/workflows/load.js";
 import { listWorkflows } from "../../src/workflows/registry.js";
 import type { WorkflowStep } from "../../src/workflows/types.js";
+import { graphNodeTypes } from "@lobster/ui/workflow-types";
 
-export type WorkflowSummary = {
-	id: string;
-	name: string;
-	description?: string;
-	source: "builtin" | "file";
-};
-
-export type WorkflowDetail = WorkflowSummary & {
-	graph?: WorkflowGraph;
-	steps?: Array<{
-		id: string;
-		fields: Array<{ name: string; value: string; language?: "bash" }>;
-	}>;
-	definition?: { filename: string; language: "yaml" | "json" | "typescript"; text: string };
-	unavailableReason?: string;
-};
-
-type SourceLanguage =
-	| "yaml"
-	| "json"
-	| "javascript"
-	| "typescript"
-	| "bash"
-	| "python"
-	| "plaintext";
-type SourceFile = { path: string; language: SourceLanguage };
-type WorkflowFilesResult = { files: SourceFile[]; defaultPath: string; truncated: boolean };
-type WorkflowFileResult = { file: SourceFile & { text: string } };
+import type {
+	LobsterWorkflowSummary as WorkflowSummary,
+	LobsterWorkflowDetail as WorkflowDetail,
+	LobsterSourceLanguage as SourceLanguage,
+	LobsterWorkflowFilesResult as WorkflowFilesResult,
+	LobsterWorkflowFileResult as WorkflowFileResult,
+} from "@lobster/ui/workflow-types";
+export type {
+	LobsterWorkflowSummary as WorkflowSummary,
+	LobsterWorkflowDetail as WorkflowDetail,
+} from "@lobster/ui/workflow-types";
 
 export class WorkflowApiError extends Error {
 	constructor(
@@ -292,7 +276,14 @@ async function readWorkflow(workspaceDir: string, filename: string): Promise<Wor
 			const steps = loaded.steps.map(projectStep);
 			if (Buffer.byteLength(JSON.stringify({ graph, steps })) > maxBytes)
 				throw new Error("Workflow graph exceeds 256 KiB");
-			workflow.graph = graph;
+			workflow.graph = {
+				...graph,
+				nodes: graph.nodes.map((node) => {
+					const type = graphNodeTypes.find((supported) => supported === node.type);
+					if (!type) throw new Error(`Unsupported workflow node type: ${node.type}`);
+					return { ...node, type };
+				}),
+			};
 			workflow.steps = steps;
 		} finally {
 			await rm(temporary, { recursive: true, force: true });

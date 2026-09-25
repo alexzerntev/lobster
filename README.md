@@ -359,11 +359,11 @@ post-dispatch errors; `llm.invoke` retains its existing retry policy.
 
 ## Development
 
-For the private plugin UI preview with Docker isolation and hot reload, see
-[UI development](dev/web/README.md). Start it with `./dev/web/dev up`; OpenClaw
-does not need to be running. This development harness is excluded from the
-published runtime and is not a production web server.
+For the self-contained workflow viewer with Docker isolation and hot reload, see
+[UI development](dev/web/README.md). Start it with `./dev/web/dev up`; no OpenClaw
+checkout or installation is needed. The viewer and its development-only server
+are excluded from the published runtime.
 
-The runtime is one TypeScript package; `dev/web` is a separate private development workspace. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
+The runtime is one TypeScript package; `ui` owns the private workflow viewer and `dev/web` owns its development-only server. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
 
 Run `pnpm test`, `pnpm typecheck`, and `pnpm lint` before submitting changes. Tests compile into `dist/test` and use Node's test runner; platform-specific process tests run only where their OS primitives exist. Dependencies observe the two-day release-age policy in `pnpm-workspace.yaml`.
