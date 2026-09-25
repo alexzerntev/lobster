@@ -7,10 +7,10 @@ import { fileURLToPath } from "node:url";
 import { parse, stringify } from "yaml";
 import { resolveWorkflowArgs } from "../../src/workflows/file.js";
 import { renderWorkflowGraph } from "../../src/workflows/graph.js";
+import { graphNodeTypes } from "../../src/workflows/graph-types.js";
 import { loadWorkflowFile } from "../../src/workflows/load.js";
 import { projectWorkflowGraph } from "../../ui/src/graph-projection.js";
 import { subworkflowTarget } from "../../ui/src/subworkflow-target.js";
-import { graphNodeTypes } from "../../ui/workflow-types.js";
 import { createWorkflowApi, WorkflowApiError } from "./dev-api.js";
 
 function fileId(filename: string): string {

@@ -61,5 +61,8 @@ jobs:
       - name: Lint and check formatting
         run: pnpm lint
 
+      - name: Typecheck engine and viewer
+        run: pnpm typecheck
+
       - name: Test
         run: pnpm test

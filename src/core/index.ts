@@ -2,10 +2,11 @@ export { createDefaultRegistry } from "../commands/registry.js";
 export { parsePipeline } from "../parser.js";
 export { runPipeline } from "../runtime.js";
 export { runWorkflowFile, resolveWorkflowArgs } from "../workflows/file.js";
-export { renderWorkflowGraph } from "../workflows/graph.js";
+export { graphNodeTypes, renderWorkflowGraph } from "../workflows/graph.js";
 export type {
 	WorkflowGraph,
 	WorkflowGraphNode,
+	WorkflowGraphNodeType,
 	WorkflowGraphEdge,
 	WorkflowGraphFormat,
 	RenderWorkflowGraphParams,

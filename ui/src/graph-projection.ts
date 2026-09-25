@@ -1,12 +1,9 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import type {
-	LobsterWorkflowDetail,
-	LobsterWorkflowGraph,
-	LobsterWorkflowStep,
-} from "../workflow-types.js";
+import type { WorkflowGraph } from "../../src/workflows/graph-types.js";
+import type { LobsterWorkflowDetail, LobsterWorkflowStep } from "../workflow-types.js";
 
-export type ProjectedNode = Omit<LobsterWorkflowGraph["nodes"][number], "type"> & {
-	type: LobsterWorkflowGraph["nodes"][number]["type"] | "join";
+export type ProjectedNode = Omit<WorkflowGraph["nodes"][number], "type"> & {
+	type: WorkflowGraph["nodes"][number]["type"] | "join";
 	parentId?: string;
 	isContainer?: boolean;
 	title?: string;
@@ -159,7 +156,7 @@ function references(value: unknown): Set<string> {
 /** A view-only expansion. Lobster's saved definition and exported graph remain unchanged. */
 export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 	nodes: ProjectedNode[];
-	edges: LobsterWorkflowGraph["edges"];
+	edges: WorkflowGraph["edges"];
 } {
 	const native = workflow.graph ?? { nodes: [], edges: [] };
 	const metadata = new Map((workflow.steps ?? []).map((step) => [step.id, step.fields]));
@@ -207,9 +204,9 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 			}
 		}
 	}
-	const edges: LobsterWorkflowGraph["edges"] = [];
+	const edges: WorkflowGraph["edges"] = [];
 	const edgeKeys = new Set<string>();
-	const addEdge = (edge: LobsterWorkflowGraph["edges"][number]) => {
+	const addEdge = (edge: WorkflowGraph["edges"][number]) => {
 		const key = JSON.stringify([edge.from, edge.to, edge.label]);
 		if (!edgeKeys.has(key)) {
 			edgeKeys.add(key);

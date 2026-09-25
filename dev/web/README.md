@@ -37,7 +37,8 @@ using port 5180 first.
   previews, and view lifecycle. `@lobster/ui` exports the two mount functions and
   their small host interface; it has no OpenClaw SDK dependency or registration.
 - `ui/workflow-types.ts`: the shared read-only viewer data contract. Graph types
-  derive from Lobster's engine; the browser does not import engine runtime code.
+  come directly from `src/workflows/graph-types.ts`, including the engine-owned
+  node-kind union. The browser does not import engine runtime code.
 - `ui/theme/`: local light/dark tokens, controls, fonts, and artwork. These preserve
   the existing appearance; licenses and provenance are in its `NOTICE.md`.
 - `src/`: the Lobster engine. JSON graph output uses the same native graph as the
@@ -105,7 +106,13 @@ The generic `step` fallback remains covered by renderer unit tests because valid
 top-level workflow steps require an execution, approval, or input field.
 
 When changing workflow syntax or adding a node kind, update these examples and
-their assertions in the same change. Keep them small and synthetic; keep invalid
+their assertions in the same change. Add native node kinds to the engine's
+`graphNodeTypes` contract; TypeScript then requires an entry in the viewer's
+exhaustive node-label map, and the fixture checks require an example. Both the
+engine and viewer typechecks run in the existing CI job. Display-only `join` and
+`builtin` nodes remain owned by the viewer.
+
+Keep examples small and synthetic; keep invalid
 inputs and specialized edge cases in the existing unit tests. Use a separate
 `LOBSTER_WORKSPACE` for personal workflows rather than committing them here.
 

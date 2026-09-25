@@ -5,10 +5,10 @@ import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { resolveWorkflowArgs } from "../../src/workflows/file.js";
 import { renderWorkflowGraph, type WorkflowGraph } from "../../src/workflows/graph.js";
+import { graphNodeTypes } from "../../src/workflows/graph-types.js";
 import { loadWorkflowFile } from "../../src/workflows/load.js";
 import { listWorkflows } from "../../src/workflows/registry.js";
 import type { WorkflowStep } from "../../src/workflows/types.js";
-import { graphNodeTypes } from "@lobster/ui/workflow-types";
 
 import type {
 	LobsterWorkflowSummary as WorkflowSummary,

@@ -4,14 +4,17 @@ import type {
 	WorkflowGraphEdge,
 	WorkflowGraphFormat,
 	WorkflowGraphNode,
+	WorkflowGraphNodeType,
 } from "./graph-types.js";
 import type { WorkflowFile, WorkflowStep } from "./types.js";
 
+export { graphNodeTypes } from "./graph-types.js";
 export type {
 	WorkflowGraph,
 	WorkflowGraphEdge,
 	WorkflowGraphFormat,
 	WorkflowGraphNode,
+	WorkflowGraphNodeType,
 } from "./graph-types.js";
 
 export type RenderWorkflowGraphParams = {
@@ -32,7 +35,7 @@ function isInputStep(step: WorkflowStep) {
 	return Boolean(step.input && typeof step.input === "object" && !Array.isArray(step.input));
 }
 
-function stepType(step: WorkflowStep) {
+function stepType(step: WorkflowStep): WorkflowGraphNodeType {
 	if (step.parallel) return "parallel";
 	if (typeof step.for_each === "string") return "for_each";
 	if (typeof step.workflow === "string" && step.workflow.trim()) return "workflow";

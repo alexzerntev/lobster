@@ -10,6 +10,7 @@ import {
 	resolveWorkflowArgs,
 	type WorkflowFile,
 	type WorkflowGraph,
+	type WorkflowGraphNodeType,
 } from "../src/core/index.js";
 
 function runCli(args: string[], env?: Record<string, string | undefined>) {
@@ -19,6 +20,27 @@ function runCli(args: string[], env?: Record<string, string | undefined>) {
 		env: { ...process.env, ...env },
 	});
 }
+
+test("workflow graph classifies every native node kind", () => {
+	const steps = {
+		run: { id: "shell", command: "echo hello" },
+		pipeline: { id: "pipe", pipeline: "json" },
+		workflow: { id: "child", workflow: "child.lobster" },
+		approval: { id: "approve", approval: true },
+		input: { id: "input", input: { prompt: "Value?", responseSchema: { type: "string" } } },
+		parallel: { id: "branches", parallel: { branches: [{ id: "branch", run: "echo branch" }] } },
+		for_each: { id: "loop", for_each: "$shell.json", steps: [{ id: "body", run: "echo item" }] },
+		// The graph renderer accepts an unclassified step even though the file loader rejects it.
+		step: { id: "generic" },
+	} satisfies Record<WorkflowGraphNodeType, WorkflowFile["steps"][number]>;
+	const graph: WorkflowGraph = JSON.parse(
+		renderWorkflowGraph({ workflow: { steps: Object.values(steps) }, format: "json" }),
+	);
+	assert.deepEqual(
+		graph.nodes.map(({ id, type }) => ({ id, type })),
+		Object.entries(steps).map(([type, step]) => ({ id: step.id, type })),
+	);
+});
 
 test("workflow graph renderer outputs mermaid nodes and labeled edges", () => {
 	const workflow = {

@@ -7,34 +7,13 @@ export type LobsterWorkflowSummary = {
 	source: "file" | "builtin";
 };
 
-export const graphNodeTypes = [
-	"run",
-	"pipeline",
-	"workflow",
-	"approval",
-	"input",
-	"parallel",
-	"for_each",
-	"step",
-] as const;
-
-// The engine owns graph structure. This boundary narrows its open node type to
-// the kinds the viewer supports after the read API validates its output.
-export type LobsterWorkflowGraph = Omit<WorkflowGraph, "nodes"> & {
-	nodes: Array<
-		Omit<WorkflowGraph["nodes"][number], "type"> & {
-			type: (typeof graphNodeTypes)[number];
-		}
-	>;
-};
-
 export type LobsterWorkflowStep = {
 	id: string;
 	fields: Array<{ name: string; value: string; language?: "bash" }>;
 };
 
 export type LobsterWorkflowDetail = LobsterWorkflowSummary & {
-	graph?: LobsterWorkflowGraph;
+	graph?: WorkflowGraph;
 	steps?: LobsterWorkflowStep[];
 	definition?: {
 		filename: string;
