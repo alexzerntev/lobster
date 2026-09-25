@@ -21,21 +21,50 @@ For repeatable automation, put shell commands, native pipeline steps, and explic
 - No new auth surface: Lobster must not own OAuth/tokens.
 - Composable macros that OpenClaw (or any agent) can invoke in one step to save tokens.
 
-## Quick start
+## Workflow viewer (development)
 
-Requires Node.js 22 or newer and the pnpm version pinned in `package.json`. From this folder:
+The repository includes a read-only browser UI for inspecting workflows. Search
+by name or description, explore a flow graph, open child workflows, and switch
+to syntax-highlighted source with a file tree. No OpenClaw installation, model,
+or credentials are needed to use the viewer.
+
+With the [Docker prerequisites](dev/web/README.md#prerequisites) installed, run
+this from the repository root:
+
+```sh
+./dev/web/dev up
+```
+
+Open <http://127.0.0.1:5180> and choose **Node types** for a tour of the supported
+steps. The examples are committed files: startup reads them and shutdown leaves
+them in place. Edit source files in your editor; the preview updates automatically.
+The UI does not execute workflows or edit files, and it is not included in the
+published CLI package.
+
+See the [viewer guide](dev/web/README.md) for a walkthrough, setup troubleshooting,
+tests, and maintenance responsibilities.
+
+## CLI quick start
+
+The CLI runtime supports Node.js 22 or newer. For development and all workspace
+tests, use Node 22.22.2+ (22.x) or 24.15+ (24.x), plus the pnpm version pinned in
+`package.json`; the viewer's test dependencies require these newer patch levels.
+From this folder:
 
 - `pnpm install --frozen-lockfile`
 - `pnpm build`
 - `pnpm test`
 - `pnpm lint`
+- `pnpm typecheck`
 - `node ./bin/lobster.js --help`
 - `node ./bin/lobster.js doctor`
 - `node ./bin/lobster.js "exec --json --shell 'echo [1,2,3]' | where '0>=0' | json"`
 
 ### Notes
 
-- `pnpm test` runs `tsc` and then executes tests against `dist/`.
+- `pnpm test` compiles and runs engine tests against `dist/`, then runs the
+  development API/host tests and viewer tests. `pnpm typecheck` checks all three
+  workspaces, including the browser code.
 - `bin/lobster.js` runs the compiled entrypoint in `dist/`; build after changing source files.
   Invalid explicit workflow file paths are reported as input errors (exit code 2). In `--mode tool`, these failures use the same JSON error envelope as other parsing errors.
 
@@ -366,4 +395,11 @@ are excluded from the published runtime.
 
 The runtime is one TypeScript package; `ui` owns the private workflow viewer and `dev/web` owns its development-only server. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
 
-Run `pnpm test`, `pnpm typecheck`, and `pnpm lint` before submitting changes. Tests compile into `dist/test` and use Node's test runner; platform-specific process tests run only where their OS primitives exist. Dependencies observe the two-day release-age policy in `pnpm-workspace.yaml`.
+Run `pnpm build`, `pnpm lint`, `pnpm typecheck`, and `pnpm test` before submitting
+changes. With the Docker preview running, `./dev/web/dev check` runs these inside
+the container. Engine tests compile into `dist/test` and use Node's test runner;
+viewer tests use Vitest with jsdom. Platform-specific process tests run only
+where their OS primitives exist. Dependencies observe the two-day release-age
+policy in `pnpm-workspace.yaml`; keep its settings and commit lockfile changes
+with dependency changes. Follow the [PR template](.github/pull_request_template.md)
+and include relevant validation results when proposing a change.

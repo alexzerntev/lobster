@@ -2,6 +2,29 @@
 set -euo pipefail
 base="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 compose=(docker compose -f "$base/compose.yaml")
+check_startup() {
+  for tool in docker python3; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      echo "Missing $tool. See dev/web/README.md for Docker setup requirements." >&2
+      exit 1
+    fi
+  done
+  python3 - <<'PY'
+import re, subprocess, sys
+
+def require_version(command, minimum, help_text):
+    result = subprocess.run(command, capture_output=True, text=True)
+    match = re.match(r'v?(\d+)\.(\d+)', result.stdout.strip())
+    if result.returncode or not match or tuple(map(int, match.groups())) < minimum:
+        sys.exit(help_text)
+
+require_version(['docker', 'version', '--format', '{{.Server.Version}}'], (28, 0),
+                'Docker Engine 28+ must be running with Linux containers. Start or update Docker, then retry.')
+require_version(['docker', 'compose', 'version', '--short'], (2, 32),
+                'Docker Compose 2.32+ is required for this development setup. Update Docker Compose, then retry.')
+PY
+  "${compose[@]}" config --quiet
+}
 stop_watch() {
   if [[ -f "$base/.watch.pid" ]]; then
     pid="$(cat "$base/.watch.pid")"
@@ -28,6 +51,7 @@ PY
 }
 case "${1:-status}" in
   up|rebuild)
+    check_startup
     stop_watch
     "${compose[@]}" up -d --build --wait --wait-timeout 120
     start_watch
@@ -35,7 +59,8 @@ case "${1:-status}" in
   stop) stop_watch; "${compose[@]}" stop ;;
   status) "${compose[@]}" ps ;;
   logs) exec "${compose[@]}" logs -f --tail 50 ;;
-  test) exec "${compose[@]}" exec -T app pnpm test:web ;;
-  shell) exec "${compose[@]}" exec app bash ;;
-  *) echo "Usage: $0 {up|stop|status|logs|test|shell|rebuild}"; exit 2 ;;
+  test) exec "${compose[@]}" exec -T -w /app app pnpm test:web ;;
+  check) exec "${compose[@]}" exec -T -w /app app sh -c 'pnpm build && pnpm lint && pnpm typecheck && pnpm test' ;;
+  shell) exec "${compose[@]}" exec -w /app app bash ;;
+  *) echo "Usage: $0 {up|stop|status|logs|test|check|shell|rebuild}"; exit 2 ;;
 esac

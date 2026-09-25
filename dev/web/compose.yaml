@@ -29,6 +29,10 @@ services:
           target: /app/src
           initial_sync: true
         - action: sync
+          path: ../../test
+          target: /app/test
+          initial_sync: true
+        - action: sync
           path: .
           target: /app/dev/web
           initial_sync: true
