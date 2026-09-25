@@ -4,11 +4,9 @@ Guidance for coding assistants operating in this repository.
 
 ## Viewer Development
 
-- Read [dev/web/README.md](dev/web/README.md) before changing the viewer or its development server.
-- Keep the viewer in `ui/` and the read-only development harness in `dev/web/`; neither belongs in runtime execution or the published package.
-- The engine owns graph node types in `src/workflows/graph-types.ts`. Update renderer handling and checked-in examples together when changing this contract.
-- Use the guide's Docker commands for isolated development and validation. The preview must not execute workflows or request credentials.
-- Update the guide when changing setup, user-visible features, or maintenance commands.
+- Keep the read-only viewer in `ui/` and the development harness in `dev/web/`; neither ships in the runtime package. Setup and checks: [dev/web/README.md](dev/web/README.md).
+- The engine owns graph node types in `src/workflows/graph-types.ts`. Update viewer handling and checked-in examples together when changing this contract.
+- Keep documentation changes concise and limited to changed features and maintenance requirements.
 
 ## When To Use Lobster
 
