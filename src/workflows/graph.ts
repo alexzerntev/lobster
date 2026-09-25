@@ -1,22 +1,27 @@
 import { resolveArgsTemplate } from "./expressions.js";
 import type { WorkflowFile, WorkflowStep } from "./types.js";
 
-export type WorkflowGraphFormat = "mermaid" | "dot" | "ascii";
+export type WorkflowGraphFormat = "mermaid" | "dot" | "ascii" | "json";
 
-type GraphNode = {
+export type WorkflowGraphNode = {
 	id: string;
 	type: string;
 	label: string;
 	shape: "box" | "diamond";
 };
 
-type GraphEdge = {
+export type WorkflowGraphEdge = {
 	from: string;
 	to: string;
 	label?: string;
 };
 
-type RenderGraphParams = {
+export type WorkflowGraph = {
+	nodes: WorkflowGraphNode[];
+	edges: WorkflowGraphEdge[];
+};
+
+export type RenderWorkflowGraphParams = {
 	workflow: WorkflowFile;
 	format: WorkflowGraphFormat;
 	args?: Record<string, unknown>;
@@ -100,14 +105,14 @@ function truncate(value: string, max = 80) {
 	return `${value.slice(0, max - 1)}…`;
 }
 
-function collectGraph(workflow: WorkflowFile, args: Record<string, unknown>) {
-	const nodes: GraphNode[] = [];
-	const edges: GraphEdge[] = [];
+function collectGraph(workflow: WorkflowFile, args: Record<string, unknown>): WorkflowGraph {
+	const nodes: WorkflowGraphNode[] = [];
+	const edges: WorkflowGraphEdge[] = [];
 	const knownStepIds = new Set(workflow.steps.map((s) => s.id));
 	let prevStepId: string | null = null;
 
 	const seenEdgeKeys = new Set<string>();
-	const addEdge = (edge: GraphEdge) => {
+	const addEdge = (edge: WorkflowGraphEdge) => {
 		const key = `${edge.from}|${edge.to}|${edge.label ?? ""}`;
 		if (seenEdgeKeys.has(key)) return;
 		seenEdgeKeys.add(key);
@@ -167,7 +172,7 @@ function escapeMermaidLabel(value: string) {
 	return value.replace(/[&"<>|]/g, (character) => entities[character as keyof typeof entities]);
 }
 
-function renderMermaid(nodes: GraphNode[], edges: GraphEdge[]) {
+function renderMermaid(nodes: WorkflowGraphNode[], edges: WorkflowGraphEdge[]) {
 	const idMap = new Map<string, string>();
 	const used = new Set<string>();
 	for (const node of nodes) {
@@ -211,7 +216,7 @@ function escapeDot(value: string) {
 	return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-function renderDot(nodes: GraphNode[], edges: GraphEdge[]) {
+function renderDot(nodes: WorkflowGraphNode[], edges: WorkflowGraphEdge[]) {
 	const lines = ["digraph workflow {", "  rankdir=TB;"];
 	for (const node of nodes) {
 		const shape = node.shape === "diamond" ? "diamond" : "box";
@@ -231,7 +236,7 @@ function renderDot(nodes: GraphNode[], edges: GraphEdge[]) {
 	return lines.join("\n");
 }
 
-function renderAscii(nodes: GraphNode[], edges: GraphEdge[]) {
+function renderAscii(nodes: WorkflowGraphNode[], edges: WorkflowGraphEdge[]) {
 	const lines = ["Workflow Graph", "", "Nodes:"];
 	for (const node of nodes) {
 		lines.push(
@@ -246,8 +251,9 @@ function renderAscii(nodes: GraphNode[], edges: GraphEdge[]) {
 	return lines.join("\n");
 }
 
-export function renderWorkflowGraph({ workflow, format, args = {} }: RenderGraphParams) {
+export function renderWorkflowGraph({ workflow, format, args = {} }: RenderWorkflowGraphParams) {
 	const { nodes, edges } = collectGraph(workflow, args);
+	if (format === "json") return JSON.stringify({ nodes, edges }, null, 2);
 	if (format === "dot") return renderDot(nodes, edges);
 	if (format === "ascii") return renderAscii(nodes, edges);
 	return renderMermaid(nodes, edges);

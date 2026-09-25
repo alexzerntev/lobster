@@ -1,0 +1,7 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true
+	},
+	"include": ["server.ts", "dev-api.ts", "dev-api.test.ts"]
+}

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+base="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+compose=(docker compose -f "$base/compose.yaml")
+stop_watch() {
+  if [[ -f "$base/.watch.pid" ]]; then
+    pid="$(cat "$base/.watch.pid")"
+    command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    if [[ "$command" == *"$base/compose.yaml"* && "$command" == *"watch --no-up"* ]]; then
+      kill "$pid"
+    fi
+    rm -f "$base/.watch.pid"
+  fi
+}
+start_watch() {
+  stop_watch
+  python3 - "$base" <<'PY'
+from pathlib import Path
+import subprocess, sys
+base = Path(sys.argv[1])
+with (base / '.watch.log').open('w') as log:
+    process = subprocess.Popen(
+        ['docker', 'compose', '-f', str(base / 'compose.yaml'), 'watch', '--no-up'],
+        stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+        start_new_session=True)
+(base / '.watch.pid').write_text(str(process.pid) + '\n')
+PY
+}
+case "${1:-status}" in
+  up|rebuild)
+    stop_watch
+    "${compose[@]}" up -d --build --wait --wait-timeout 120
+    start_watch
+    ;;
+  stop) stop_watch; "${compose[@]}" stop ;;
+  status) "${compose[@]}" ps ;;
+  logs) exec "${compose[@]}" logs -f --tail 50 ;;
+  test) exec "${compose[@]}" exec -T app pnpm test:web ;;
+  shell) exec "${compose[@]}" exec app bash ;;
+  *) echo "Usage: $0 {up|stop|status|logs|test|shell|rebuild}"; exit 2 ;;
+esac

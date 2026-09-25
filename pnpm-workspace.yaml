@@ -1,7 +1,11 @@
 packages:
   - '.'
+  - 'dev/web'
 
 overrides:
   fast-uri: 4.1.4
 
 minimumReleaseAge: 2880
+
+allowBuilds:
+  esbuild: true

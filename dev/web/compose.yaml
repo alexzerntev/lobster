@@ -1,0 +1,84 @@
+name: lobster-web-dev
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: dev/web/Dockerfile
+      additional_contexts:
+        lobster-ui: ../../../openclaw/extensions/lobster
+        openclaw-ui: ../../../openclaw/ui
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 512
+    cpus: 4
+    mem_limit: 2g
+    networks: [isolated]
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:5180/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    develop:
+      watch:
+        - action: sync
+          path: ../../src
+          target: /app/src
+          initial_sync: true
+        - action: sync
+          path: .
+          target: /app/dev/web
+          initial_sync: true
+          ignore: [node_modules/, dist/, .env, .env.*, "*.log", "*.pid"]
+        - action: sync
+          path: ../../../openclaw/extensions/lobster/browser
+          target: /openclaw/extensions/lobster/browser
+          initial_sync: true
+          ignore: [node_modules/, "*.test.ts"]
+        - action: sync
+          path: ../../../openclaw/extensions/lobster/workflow-types.ts
+          target: /openclaw/extensions/lobster/workflow-types.ts
+          initial_sync: true
+        - action: sync
+          path: ../../../openclaw/ui/src/styles
+          target: /openclaw/ui/src/styles
+          initial_sync: true
+          ignore: ["*.test.ts"]
+        - action: sync
+          path: ../../../openclaw/ui/src/assets/themes
+          target: /openclaw/ui/src/assets/themes
+          initial_sync: true
+        - action: sync
+          path: ../../../openclaw/ui/public/fonts
+          target: /openclaw/ui/public/fonts
+          initial_sync: true
+  ingress:
+    build:
+      context: .
+      dockerfile: Ingress.Dockerfile
+    init: true
+    user: "101:101"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 64m
+    ports: ["127.0.0.1:5180:5180"]
+    networks: [isolated, frontend]
+    depends_on:
+      app: { condition: service_healthy }
+networks:
+  isolated:
+    internal: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+  frontend:
+    driver: bridge

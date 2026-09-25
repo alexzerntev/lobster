@@ -1,0 +1,9 @@
+/* Match the host import order without importing its runtime or shell chrome. */
+@import "@openclaw-ui/public/fonts/instrument-sans.css";
+@import "@openclaw-ui/public/fonts/jetbrains-mono.css";
+@import "@openclaw-ui/src/styles/base.css";
+@import "@openclaw-ui/src/styles/theme-backgrounds.css";
+@import "@openclaw-ui/src/styles/layout.css";
+@import "@openclaw-ui/src/styles/layout.mobile.css";
+@import "@openclaw-ui/src/styles/components.css";
+@import "@openclaw-ui/src/styles/settings-controls.css";

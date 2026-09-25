@@ -1,0 +1,33 @@
+/* Development-only host geometry. Presentation remains owned by OpenClaw and
+   the plugin; there are no copied theme tokens, controls, or page styles here. */
+.shell.lobster-dev-host {
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: minmax(0, 1fr);
+	grid-template-areas: "content";
+}
+
+/* The host owns modal geometry; the embedded view owns the panel and contents. */
+.lobster-dev-dialog {
+	--openclaw-modal-height-limit: var(--openclaw-modal-max-height, calc(100dvh - 48px));
+	width: min(var(--openclaw-modal-width, 540px), calc(100vw - 48px));
+	max-width: var(--openclaw-modal-max-width, calc(100vw - 48px));
+	max-height: var(--openclaw-modal-height-limit);
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	overflow: visible;
+}
+
+.lobster-dev-dialog::backdrop {
+	background: var(--wa-color-overlay-modal, color-mix(in srgb, var(--text) 12%, transparent));
+	backdrop-filter: var(--openclaw-modal-backdrop-filter, blur(4px));
+}
+
+@media (max-width: 640px) {
+	.lobster-dev-dialog {
+		--openclaw-modal-height-limit: 90dvh;
+		width: min(var(--openclaw-modal-width, 540px), calc(100vw - 24px));
+		max-width: var(--openclaw-modal-max-width, calc(100vw - 24px));
+	}
+}

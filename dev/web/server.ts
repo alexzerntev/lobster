@@ -1,0 +1,143 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import type { ServerResponse } from "node:http";
+import { createServer } from "vite";
+import { createWorkflowApi, WorkflowApiError } from "./dev-api.js";
+
+if (process.env.NODE_ENV === "production") {
+	throw new Error("The Lobster preview server is development-only; it is not a production server.");
+}
+
+const root = path.dirname(fileURLToPath(import.meta.url));
+const uiRoot = path.resolve(
+	process.env.LOBSTER_UI_ROOT ?? path.join(root, "../../../openclaw/extensions/lobster"),
+);
+const openclawUiRoot = path.resolve(
+	process.env.LOBSTER_OPENCLAW_UI_ROOT ?? path.join(root, "../../../openclaw/ui"),
+);
+const workspace = path.resolve(process.env.LOBSTER_WORKSPACE ?? path.join(root, "workspace"));
+const api = createWorkflowApi(workspace);
+const clients = new Set<ServerResponse>();
+let pendingChange: ReturnType<typeof setTimeout> | undefined;
+let heartbeat: ReturnType<typeof setInterval> | undefined;
+
+const server = await createServer({
+	configFile: false,
+	mode: "development",
+	publicDir: false,
+	root,
+	resolve: {
+		alias: {
+			"@lobster-view": path.join(uiRoot, "browser"),
+			"@openclaw-ui": openclawUiRoot,
+		},
+		dedupe: ["react", "react-dom"],
+	},
+	server: {
+		host: process.env.LOBSTER_WEB_HOST ?? "127.0.0.1",
+		port: Number(process.env.LOBSTER_WEB_PORT ?? 5180),
+		strictPort: true,
+		fs: {
+			allow: [
+				root,
+				uiRoot,
+				path.join(openclawUiRoot, "src/styles"),
+				path.join(openclawUiRoot, "src/assets/themes"),
+				path.join(openclawUiRoot, "public/fonts"),
+			],
+		},
+		watch: { usePolling: true, interval: 250 },
+	},
+	plugins: [
+		{
+			name: "lobster-development-api",
+			configureServer(vite) {
+				vite.middlewares.use((request, response, next) => {
+					const url = new URL(request.url ?? "/", "http://localhost");
+					if (!url.pathname.startsWith("/api/")) return next();
+					const send = (status: number, body: unknown) => {
+						response.writeHead(status, {
+							"Content-Type": "application/json",
+							"Cache-Control": "no-store",
+						});
+						response.end(JSON.stringify(body));
+					};
+					if (request.method !== "GET")
+						return send(405, { error: "Only read-only GET requests are supported." });
+					if (
+						request.headers.origin &&
+						new URL(request.headers.origin).host !== request.headers.host
+					) {
+						return send(403, { error: "Cross-origin requests are not supported." });
+					}
+					if (url.pathname === "/api/events") {
+						response.writeHead(200, {
+							"Content-Type": "text/event-stream",
+							"Cache-Control": "no-cache",
+							"X-Accel-Buffering": "no",
+						});
+						response.write("event: workflows-changed\ndata: {}\n\n");
+						clients.add(response);
+						response.on("close", () => clients.delete(response));
+						return;
+					}
+					void (async () => {
+						try {
+							if (url.pathname === "/api/health") return send(200, { ok: true });
+							if (url.pathname === "/api/workflows") return send(200, await api.list());
+							if (url.pathname === "/api/workflow")
+								return send(200, await api.get(url.searchParams.get("id") ?? ""));
+							if (url.pathname === "/api/workflow/files")
+								return send(200, await api.files(url.searchParams.get("id") ?? ""));
+							if (url.pathname === "/api/workflow/file")
+								return send(
+									200,
+									await api.file(
+										url.searchParams.get("id") ?? "",
+										url.searchParams.get("path") ?? "",
+									),
+								);
+							send(404, { error: "Unknown endpoint." });
+						} catch (error) {
+							send(error instanceof WorkflowApiError ? error.statusCode : 500, {
+								error: error instanceof Error ? error.message : "Could not read workflow.",
+							});
+						}
+					})();
+				});
+			},
+		},
+	],
+});
+
+const changed = (_event: string, filename: string) => {
+	const relative = path.relative(path.join(workspace, "workflows"), filename);
+	if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+		return;
+	clearTimeout(pendingChange);
+	pendingChange = setTimeout(() => {
+		pendingChange = undefined;
+		for (const client of clients) client.write("event: workflows-changed\ndata: {}\n\n");
+	}, 100);
+};
+server.watcher.add(path.join(workspace, "workflows"));
+server.watcher.on("all", changed);
+heartbeat = setInterval(() => {
+	for (const client of clients) client.write(": heartbeat\n\n");
+}, 30_000);
+heartbeat.unref();
+let closing = false;
+const close = async () => {
+	if (closing) return;
+	closing = true;
+	clearTimeout(pendingChange);
+	clearInterval(heartbeat);
+	server.watcher.off("all", changed);
+	for (const client of clients) client.end();
+	clients.clear();
+	await server.close();
+};
+process.once("SIGTERM", () => void close());
+process.once("SIGINT", () => void close());
+await server.listen();
+server.printUrls();

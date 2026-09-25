@@ -5,7 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { renderWorkflowGraph } from "../src/workflows/graph.js";
+import {
+	renderWorkflowGraph,
+	resolveWorkflowArgs,
+	type WorkflowFile,
+	type WorkflowGraph,
+} from "../src/core/index.js";
 
 function runCli(args: string[], env?: Record<string, string | undefined>) {
 	const bin = path.join(process.cwd(), "bin", "lobster.js");
@@ -115,6 +120,83 @@ test("cli graph supports --format dot", async () => {
 	assert.match(result.stdout, /"gate" \[shape=diamond/);
 });
 
+test("JSON graph preserves native nodes and edges without executing the workflow", async (t) => {
+	const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "lobster-graph-json-"));
+	t.after(() => fsp.rm(tmpDir, { recursive: true, force: true }));
+	const filePath = path.join(tmpDir, "workflow.json");
+	const marker = path.join(tmpDir, "executed");
+	const workflow: WorkflowFile = {
+		args: { message: { default: "<ready> & done | next" } },
+		steps: [
+			{ id: "fetch-items", run: 'touch "$MARKER"' },
+			{ id: "filter", pipeline: "head --n 1 | json", stdin: "$fetch-items.json" },
+			{ id: "loop", for_each: "$filter.json", steps: [{ id: "child", run: "echo item" }] },
+			{
+				id: "parallel",
+				parallel: {
+					branches: [
+						{ id: "branch", run: "echo branch" },
+						{ id: "second", pipeline: "head --n 1", stdin: "$fetch-items.json" },
+					],
+				},
+			},
+			{ id: "gate", approval: "Proceed?", stdin: "$fetch-items.stdout" },
+			{
+				id: "notify.items",
+				run: 'echo "${message}"',
+				when: "$gate.approved && $filter.json.length > 0",
+			},
+		],
+	};
+	const expected: WorkflowGraph = {
+		nodes: [
+			{ id: "fetch-items", type: "run", label: 'fetch-items\\nrun: touch "$MARKER"', shape: "box" },
+			{
+				id: "filter",
+				type: "pipeline",
+				label: "filter\\npipeline: head --n 1 | json",
+				shape: "box",
+			},
+			{ id: "loop", type: "for_each", label: "loop\\nfor_each: $filter.json", shape: "box" },
+			{ id: "parallel", type: "parallel", label: "parallel\\nparallel (all)", shape: "box" },
+			{ id: "gate", type: "approval", label: "gate\\napproval gate", shape: "diamond" },
+			{
+				id: "notify.items",
+				type: "run",
+				label: 'notify.items\\nrun: echo "<ready> & done | next"',
+				shape: "box",
+			},
+		],
+		edges: [
+			{ from: "fetch-items", to: "filter", label: "next" },
+			{ from: "fetch-items", to: "filter", label: "stdin" },
+			{ from: "filter", to: "loop", label: "next" },
+			{ from: "filter", to: "loop", label: "for_each" },
+			{ from: "loop", to: "parallel", label: "next" },
+			{ from: "parallel", to: "gate", label: "next" },
+			{ from: "fetch-items", to: "gate", label: "stdin" },
+			{ from: "gate", to: "notify.items", label: "next" },
+			{
+				from: "gate",
+				to: "notify.items",
+				label: "when: $gate.approved && $filter.json.length > 0",
+			},
+			{
+				from: "filter",
+				to: "notify.items",
+				label: "when: $gate.approved && $filter.json.length > 0",
+			},
+		],
+	};
+	const args = resolveWorkflowArgs(workflow.args, {});
+	assert.deepEqual(JSON.parse(renderWorkflowGraph({ workflow, format: "json", args })), expected);
+	await fsp.writeFile(filePath, JSON.stringify(workflow), "utf8");
+	const result = runCli(["graph", "--file", filePath, "--format", "json"], { MARKER: marker });
+	assert.equal(result.status, 0, `stderr=${result.stderr}`);
+	assert.deepEqual(JSON.parse(result.stdout), expected);
+	await assert.rejects(fsp.access(marker), { code: "ENOENT" });
+});
+
 test("cli graph rejects unsupported formats", async () => {
 	const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "lobster-graph-bad-format-"));
 	const filePath = path.join(tmpDir, "workflow.lobster");
@@ -122,5 +204,5 @@ test("cli graph rejects unsupported formats", async () => {
 
 	const result = runCli(["graph", "--file", filePath, "--format", "svg"]);
 	assert.equal(result.status, 2);
-	assert.match(result.stderr, /graph --format must be one of: mermaid, dot, ascii/);
+	assert.match(result.stderr, /graph --format must be one of: mermaid, dot, ascii, json/);
 });

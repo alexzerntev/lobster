@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"lib": ["ES2023", "DOM"],
+		"types": ["node", "vite/client"],
+		"strict": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
+		"paths": {
+			"@lobster-view/*": ["../../../openclaw/extensions/lobster/browser/*"]
+		}
+	},
+	"include": ["main.ts", "mock-host.ts", "mock-host.test.ts"]
+}
