@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
-import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
+import { fileURLToPath } from "node:url";
 import { parse, stringify } from "yaml";
 import { resolveWorkflowArgs } from "../../src/workflows/file.js";
 import { renderWorkflowGraph } from "../../src/workflows/graph.js";
 import { loadWorkflowFile } from "../../src/workflows/load.js";
+import { projectWorkflowGraph } from "../../ui/src/graph-projection.js";
+import { subworkflowTarget } from "../../ui/src/subworkflow-target.js";
+import { graphNodeTypes } from "../../ui/workflow-types.js";
 import { createWorkflowApi, WorkflowApiError } from "./dev-api.js";
 
 function fileId(filename: string): string {
@@ -19,6 +23,92 @@ async function fixture(t: TestContext) {
 	await mkdir(path.join(workspace, "workflows"));
 	return { workspace, api: createWorkflowApi(workspace) };
 }
+
+test("checked-in preview workflows stay discoverable, inspectable, and visualizable", async (t) => {
+	const workspace = fileURLToPath(new URL("./workspace/", import.meta.url));
+	const directory = path.join(workspace, "workflows");
+	const filenames = (await readdir(directory, { recursive: true }))
+		.filter((filename) => /\.(?:lobster|ya?ml|json)$/iu.test(filename))
+		.map((filename) => filename.split(path.sep).join("/"));
+	assert.ok(filenames.length > 0, "The preview must have checked-in example workflows");
+	const api = createWorkflowApi(workspace);
+	const { workflows } = await api.list();
+	assert.deepEqual(
+		workflows
+			.filter((workflow) => workflow.source === "file")
+			.map(({ id }) => id)
+			.sort(),
+		filenames.map(fileId).sort(),
+	);
+	const coveredTypes = new Set<string>();
+	for (const filename of filenames) {
+		await t.test(filename, async () => {
+			const { workflow } = await api.get(fileId(filename));
+			assert.equal(workflow.unavailableReason, undefined);
+			assert.ok(workflow.graph?.nodes.length, "The example must have a usable graph");
+			assert.equal(
+				workflow.definition?.text,
+				await readFile(path.join(directory, filename), "utf8"),
+			);
+			const tree = await api.files(workflow.id);
+			assert.equal(tree.defaultPath, filename);
+			assert.equal(tree.truncated, false);
+			assert.ok(tree.files.some((file) => file.path === filename));
+			assert.equal((await api.file(workflow.id, filename)).file.text, workflow.definition.text);
+			const projected = projectWorkflowGraph(workflow);
+			const ids = new Set(projected.nodes.map((node) => node.id));
+			assert.equal(ids.size, projected.nodes.length);
+			for (const edge of projected.edges) {
+				assert.ok(ids.has(edge.from) && ids.has(edge.to), `Dangling edge: ${JSON.stringify(edge)}`);
+			}
+			for (const node of workflow.graph.nodes) {
+				coveredTypes.add(node.type);
+				assert.ok(ids.has(node.id), `Missing visual node: ${node.id}`);
+				if (node.type === "workflow") {
+					const target = subworkflowTarget(workflow, node.id);
+					assert.ok(tree.files.some((file) => file.path === target.filename));
+					const { workflow: child } = await api.get(target.id);
+					assert.equal(child.unavailableReason, undefined);
+					assert.ok(child.graph?.nodes.length, `Unavailable child: ${target.filename}`);
+				}
+			}
+		});
+	}
+	// "step" is the renderer's generic fallback; the file loader requires an
+	// execution, approval, or input field. Its fallback cases live in UI tests.
+	assert.deepEqual(
+		[...coveredTypes].sort(),
+		graphNodeTypes.filter((type) => type !== "step").sort(),
+		"Keep the preview examples in sync with supported workflow node kinds",
+	);
+});
+
+test("node-types preview keeps two branches and a multi-step loop to inspect", async () => {
+	const api = createWorkflowApi(fileURLToPath(new URL("./workspace/", import.meta.url)));
+	const { workflow } = await api.get(fileId("node-types.lobster"));
+	assert.equal(workflow.unavailableReason, undefined);
+	const { nodes, edges } = projectWorkflowGraph(workflow);
+	const parallel = nodes.find((node) => node.type === "parallel");
+	assert.ok(parallel);
+	assert.equal(
+		edges.filter((edge) => edge.from === parallel.id && edge.label === "branch").length,
+		2,
+	);
+	const loop = nodes.find((node) => node.type === "for_each");
+	assert.ok(loop?.isContainer);
+	const steps = nodes.filter((node) => node.parentId === loop.id);
+	assert.equal(steps.length, 2);
+	assert.ok(
+		edges.some(
+			(edge) => edge.from === steps[0].id && edge.to === steps[1].id && edge.label === "next step",
+		),
+	);
+	assert.ok(
+		edges.some(
+			(edge) => edge.from === steps[1].id && edge.to === steps[0].id && edge.label === "next item",
+		),
+	);
+});
 
 test("catalog discovers nested workflows and keeps malformed files visible", async (t) => {
 	const { workspace, api } = await fixture(t);

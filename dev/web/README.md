@@ -94,6 +94,26 @@ pnpm test
 tests (Vitest with jsdom). The engine keeps its existing Node tests. Use the pinned
 pnpm, TypeScript, oxfmt, and oxlint; dependencies retain the release-age policy.
 
+### Keeping the examples current
+
+The checked-in files in `workspace/workflows/` are shared development fixtures,
+not generated seed data. The server loads them directly. The existing API test
+suite discovers those same files and passes them through the real loader, JSON
+graph output, and viewer projection. It checks source inspection, child-workflow
+links, supported node-kind coverage, and the example's branch and loop structure.
+The generic `step` fallback remains covered by renderer unit tests because valid
+top-level workflow steps require an execution, approval, or input field.
+
+When changing workflow syntax or adding a node kind, update these examples and
+their assertions in the same change. Keep them small and synthetic; keep invalid
+inputs and specialized edge cases in the existing unit tests. Use a separate
+`LOBSTER_WORKSPACE` for personal workflows rather than committing them here.
+
+`./dev/web/dev test` runs these checks in Docker; they are also included in
+`pnpm test` and the existing CI job. Startup only reads the files: it neither
+rewrites examples nor executes their commands. These checks validate inspection
+and visualization, not command execution or pixel-level appearance.
+
 ## Isolation
 
 The app has no host mounts, Docker socket, credentials, or outbound network.
