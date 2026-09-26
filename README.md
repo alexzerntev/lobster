@@ -23,19 +23,22 @@ For repeatable automation, put shell commands, native pipeline steps, and explic
 
 ## Quick start
 
-Requires Node.js 22 or newer and the pnpm version pinned in `package.json`. From this folder:
+The CLI supports Node.js 22 or newer. For workspace development/tests, use Node
+22.22.2+ (22.x) or 24.15+ (24.x) and the pnpm version pinned in `package.json`.
+From this folder:
 
 - `pnpm install --frozen-lockfile`
 - `pnpm build`
 - `pnpm test`
 - `pnpm lint`
+- `pnpm typecheck`
 - `node ./bin/lobster.js --help`
 - `node ./bin/lobster.js doctor`
 - `node ./bin/lobster.js "exec --json --shell 'echo [1,2,3]' | where '0>=0' | json"`
 
 ### Notes
 
-- `pnpm test` runs `tsc` and then executes tests against `dist/`.
+- `pnpm test` compiles and runs engine tests against `dist/`, then the development API and viewer tests.
 - `bin/lobster.js` runs the compiled entrypoint in `dist/`; build after changing source files.
 Invalid explicit workflow file paths are reported as input errors (exit code 2). In `--mode tool`, these failures use the same JSON error envelope as other parsing errors.
 
@@ -190,6 +193,7 @@ lobster graph --file path/to/workflow.lobster
 lobster graph --file path/to/workflow.lobster --format mermaid
 lobster graph --file path/to/workflow.lobster --format dot
 lobster graph --file path/to/workflow.lobster --format ascii
+lobster graph --file path/to/workflow.lobster --format json
 lobster graph --file path/to/workflow.lobster --args-json '{"location":"Seattle"}'
 ```
 
@@ -205,6 +209,7 @@ Format notes:
 - `mermaid` (default): emits `flowchart TD` text for GitHub/Markdown rendering
 - `dot`: emits Graphviz DOT syntax
 - `ascii`: emits a terminal-friendly node/edge list
+- `json`: emits the same graph as a JSON object with `nodes` and `edges`. Nodes contain the original `id`, `type`, `label`, and `shape`; edges contain `from`, `to`, and an optional `label`. IDs and labels are not escaped for Mermaid or DOT. Labels retain the literal `\n` separator used by the graph collector.
 
 ## Calling LLMs from workflows
 
@@ -348,8 +353,25 @@ content. A declared Content-Length over the limit is also rejected immediately.
 Tool dispatch remains non-retryable after an overflow, as with other
 post-dispatch errors; `llm.invoke` retains its existing retry policy.
 
+## Workflow viewer
+
+Run `lobster view --workspace /path/to/project` and open the printed local URL.
+The read-only viewer provides search, pagination, flow graphs, child workflow
+dialogs, and highlighted source with a file tree. It reads the workspace's
+`workflows/` directory and watches changes automatically; viewing never runs
+workflows. The default workspace is the current directory and the default port
+is 5180 (`--port` overrides it). Ctrl+C stops the server and watcher.
+
+The installed CLI includes built assets and needs no OpenClaw or development
+server. OpenClaw's existing plugin embeds the same [viewer library](ui/README.md).
+
 ## Development
 
-The source is one TypeScript package. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
+Use `pnpm dev:web` for the same viewer with source hot reload and checked-in
+examples. `pnpm build` builds the CLI and standalone assets; `pnpm build:viewer`
+builds the embeddable library. See [UI development](dev/web/README.md) for checks
+and maintenance.
 
-Run `pnpm test`, `pnpm typecheck`, and `pnpm lint` before submitting changes. Tests compile into `dist/test` and use Node's test runner; platform-specific process tests run only where their OS primitives exist. Dependencies observe the two-day release-age policy in `pnpm-workspace.yaml`.
+The runtime is one TypeScript package; `ui` owns the reusable viewer, inspection API, and standalone host; `dev/web` supplies development tooling. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
+
+Run `pnpm build`, `pnpm test`, `pnpm typecheck`, and `pnpm lint` before submitting changes. Engine tests compile into `dist/test` and use Node's test runner; platform-specific process tests run only where their OS primitives exist. Dependencies observe the two-day release-age policy in `pnpm-workspace.yaml`.

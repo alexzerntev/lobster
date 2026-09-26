@@ -24,6 +24,9 @@ test("prepared npm package excludes compiled tests and keeps runtime entrypoints
 	for (const entry of [...Object.values(pkg.bin), ...Object.values(pkg.exports)]) {
 		assert.ok(files.has(String(entry).replace(/^\.\//, "")), `Missing entrypoint: ${entry}`);
 	}
+	assert.ok(files.has("dist/view/index.html"));
+	assert.ok(files.has("dist/ui/standalone/server.js"));
+	assert.ok(files.has("dist/src/workflows/github_pr_monitor.ts"));
 	assert.ok(files.has("bin/invoke.js"));
 	assert.ok(files.has("dist/src/cli.js"));
 	assert.ok(files.has("dist/src/cli.js.map"));

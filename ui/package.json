@@ -1,0 +1,64 @@
+{
+	"name": "@clawdbot/lobster-viewer",
+	"version": "2026.9.13",
+	"description": "Read-only Lobster workflow viewer and inspection API",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/openclaw/lobster.git",
+		"directory": "ui"
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"THIRD_PARTY_NOTICES.md"
+	],
+	"type": "module",
+	"sideEffects": [
+		"**/*.css"
+	],
+	"main": "./dist/browser/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/browser/index.js"
+		},
+		"./server": {
+			"types": "./dist/server.d.ts",
+			"default": "./dist/ui/server/index.js"
+		},
+		"./styles.css": "./dist/browser/index.css"
+	},
+	"scripts": {
+		"test": "vitest run",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"lint": "oxlint --config .oxlintrc.json --tsconfig tsconfig.json .",
+		"build": "node build.mjs && tsc -p tsconfig.build.json && tsc -p tsconfig.server.json",
+		"prepack": "pnpm build",
+		"test:package": "node --test package.test.mjs"
+	},
+	"dependencies": {
+		"@types/node": "^22.20.2",
+		"ajv": "^8.20.0",
+		"chokidar": "5.0.0",
+		"yaml": "2.9.1"
+	},
+	"devDependencies": {
+		"@dagrejs/dagre": "3.1.1",
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
+		"@xyflow/react": "12.11.6",
+		"esbuild": "0.28.2",
+		"highlight.js": "11.12.0",
+		"jsdom": "30.0.1",
+		"react": "19.3.0",
+		"react-dom": "19.3.0",
+		"typescript": "^7.0.2",
+		"vitest": "5.0.1"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"packageManager": "pnpm@12.5.1"
+}

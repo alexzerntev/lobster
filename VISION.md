@@ -17,7 +17,12 @@ OpenClaw owns intent, user interaction, authentication, provider integration, an
 
 The intended inference direction is gateway-only, as recorded in [#135](https://github.com/openclaw/lobster/issues/135). Current releases still support OpenClaw, Pi, HTTP, and injected adapters. The gateway contract and compatibility window must be settled before those configurations are retired; no new vendor adapters belong in the engine.
 
-Lobster currently renders static workflow graphs in Mermaid, DOT, and ASCII. A live dashboard and retained run history are separate product decisions, tracked in [#163](https://github.com/openclaw/lobster/issues/163).
+Lobster renders static workflow graphs in Mermaid, DOT, ASCII, and JSON. The
+`lobster view` command and OpenClaw plugin share a read-only viewer for these
+graphs and workflow source. The CLI serves built assets locally; the
+[development host](dev/web/README.md) adds source hot reload. Viewing does not
+execute workflows. A live dashboard and retained run history
+are separate product decisions, tracked in [#163](https://github.com/openclaw/lobster/issues/163).
 
 ## Use
 

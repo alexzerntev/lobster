@@ -1,7 +1,12 @@
 packages:
-  - '.'
+  - "."
+  - "dev/web"
+  - "ui"
 
 overrides:
   fast-uri: 4.2.1
 
 minimumReleaseAge: 2880
+
+allowBuilds:
+  esbuild: true

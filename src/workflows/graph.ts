@@ -1,49 +1,28 @@
 import { resolveArgsTemplate } from "./expressions.js";
+import { extractStepRefs, graphStepType } from "./graph-model.js";
+import type {
+	WorkflowGraph,
+	WorkflowGraphEdge,
+	WorkflowGraphFormat,
+	WorkflowGraphNode,
+} from "./graph-types.js";
+import { isApprovalStep, isInputStep } from "./step.js";
 import type { WorkflowFile, WorkflowStep } from "./types.js";
 
-export type WorkflowGraphFormat = "mermaid" | "dot" | "ascii";
+export { graphNodeTypes } from "./graph-types.js";
+export type {
+	WorkflowGraph,
+	WorkflowGraphEdge,
+	WorkflowGraphFormat,
+	WorkflowGraphNode,
+	WorkflowGraphNodeType,
+} from "./graph-types.js";
 
-type GraphNode = {
-	id: string;
-	type: string;
-	label: string;
-	shape: "box" | "diamond";
-};
-
-type GraphEdge = {
-	from: string;
-	to: string;
-	label?: string;
-};
-
-type RenderGraphParams = {
+export type RenderWorkflowGraphParams = {
 	workflow: WorkflowFile;
 	format: WorkflowGraphFormat;
 	args?: Record<string, unknown>;
 };
-
-function isApprovalStep(step: WorkflowStep) {
-	if (step.approval === true) return true;
-	if (typeof step.approval === "string" && step.approval.trim().length > 0) return true;
-	if (step.approval && typeof step.approval === "object" && !Array.isArray(step.approval))
-		return true;
-	return false;
-}
-
-function isInputStep(step: WorkflowStep) {
-	return Boolean(step.input && typeof step.input === "object" && !Array.isArray(step.input));
-}
-
-function stepType(step: WorkflowStep) {
-	if (step.parallel) return "parallel";
-	if (typeof step.for_each === "string") return "for_each";
-	if (typeof step.workflow === "string" && step.workflow.trim()) return "workflow";
-	if (typeof step.pipeline === "string" && step.pipeline.trim()) return "pipeline";
-	if (typeof step.run === "string" || typeof step.command === "string") return "run";
-	if (isApprovalStep(step)) return "approval";
-	if (isInputStep(step)) return "input";
-	return "step";
-}
 
 function stepDetails(step: WorkflowStep, args: Record<string, unknown>) {
 	if (step.parallel) {
@@ -62,37 +41,9 @@ function stepDetails(step: WorkflowStep, args: Record<string, unknown>) {
 	if (typeof shell === "string" && shell.trim()) {
 		return `run: ${resolveArgsTemplate(shell, args)}`;
 	}
-	if (isApprovalStep(step)) return "approval gate";
-	if (isInputStep(step)) return "input request";
+	if (isApprovalStep(step.approval)) return "approval gate";
+	if (isInputStep(step.input)) return "input request";
 	return "";
-}
-
-function extractStepRefsFromString(value: string): string[] {
-	const refs = new Set<string>();
-	const rx = /\$([A-Za-z0-9_-]+)\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*/g;
-	for (const m of value.matchAll(rx)) {
-		if (m[1]) refs.add(m[1]);
-	}
-	return [...refs];
-}
-
-function extractStepRefs(value: unknown): string[] {
-	if (typeof value === "string") return extractStepRefsFromString(value);
-	if (Array.isArray(value)) {
-		const refs = new Set<string>();
-		for (const item of value) {
-			for (const ref of extractStepRefs(item)) refs.add(ref);
-		}
-		return [...refs];
-	}
-	if (value && typeof value === "object") {
-		const refs = new Set<string>();
-		for (const v of Object.values(value as Record<string, unknown>)) {
-			for (const ref of extractStepRefs(v)) refs.add(ref);
-		}
-		return [...refs];
-	}
-	return [];
 }
 
 function truncate(value: string, max = 80) {
@@ -100,14 +51,14 @@ function truncate(value: string, max = 80) {
 	return `${value.slice(0, max - 1)}…`;
 }
 
-function collectGraph(workflow: WorkflowFile, args: Record<string, unknown>) {
-	const nodes: GraphNode[] = [];
-	const edges: GraphEdge[] = [];
+function collectGraph(workflow: WorkflowFile, args: Record<string, unknown>): WorkflowGraph {
+	const nodes: WorkflowGraphNode[] = [];
+	const edges: WorkflowGraphEdge[] = [];
 	const knownStepIds = new Set(workflow.steps.map((s) => s.id));
 	let prevStepId: string | null = null;
 
 	const seenEdgeKeys = new Set<string>();
-	const addEdge = (edge: GraphEdge) => {
+	const addEdge = (edge: WorkflowGraphEdge) => {
 		const key = `${edge.from}|${edge.to}|${edge.label ?? ""}`;
 		if (seenEdgeKeys.has(key)) return;
 		seenEdgeKeys.add(key);
@@ -115,14 +66,14 @@ function collectGraph(workflow: WorkflowFile, args: Record<string, unknown>) {
 	};
 
 	for (const step of workflow.steps) {
-		const type = stepType(step);
+		const type = graphStepType(step);
 		const details = stepDetails(step, args);
 		const label = details ? `${step.id}\\n${truncate(details)}` : step.id;
 		nodes.push({
 			id: step.id,
 			type,
 			label,
-			shape: isApprovalStep(step) ? "diamond" : "box",
+			shape: isApprovalStep(step.approval) ? "diamond" : "box",
 		});
 
 		if (prevStepId) {
@@ -167,7 +118,7 @@ function escapeMermaidLabel(value: string) {
 	return value.replace(/[&"<>|]/g, (character) => entities[character as keyof typeof entities]);
 }
 
-function renderMermaid(nodes: GraphNode[], edges: GraphEdge[]) {
+function renderMermaid(nodes: WorkflowGraphNode[], edges: WorkflowGraphEdge[]) {
 	const idMap = new Map<string, string>();
 	const used = new Set<string>();
 	for (const node of nodes) {
@@ -211,7 +162,7 @@ function escapeDot(value: string) {
 	return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-function renderDot(nodes: GraphNode[], edges: GraphEdge[]) {
+function renderDot(nodes: WorkflowGraphNode[], edges: WorkflowGraphEdge[]) {
 	const lines = ["digraph workflow {", "  rankdir=TB;"];
 	for (const node of nodes) {
 		const shape = node.shape === "diamond" ? "diamond" : "box";
@@ -231,7 +182,7 @@ function renderDot(nodes: GraphNode[], edges: GraphEdge[]) {
 	return lines.join("\n");
 }
 
-function renderAscii(nodes: GraphNode[], edges: GraphEdge[]) {
+function renderAscii(nodes: WorkflowGraphNode[], edges: WorkflowGraphEdge[]) {
 	const lines = ["Workflow Graph", "", "Nodes:"];
 	for (const node of nodes) {
 		lines.push(
@@ -246,8 +197,9 @@ function renderAscii(nodes: GraphNode[], edges: GraphEdge[]) {
 	return lines.join("\n");
 }
 
-export function renderWorkflowGraph({ workflow, format, args = {} }: RenderGraphParams) {
+export function renderWorkflowGraph({ workflow, format, args = {} }: RenderWorkflowGraphParams) {
 	const { nodes, edges } = collectGraph(workflow, args);
+	if (format === "json") return JSON.stringify({ nodes, edges }, null, 2);
 	if (format === "dot") return renderDot(nodes, edges);
 	if (format === "ascii") return renderAscii(nodes, edges);
 	return renderMermaid(nodes, edges);

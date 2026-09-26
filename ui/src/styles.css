@@ -1,0 +1,858 @@
+.lobster-workflows {
+	min-width: 0;
+}
+
+.lobster-workflows > .content-header {
+	max-width: 1120px;
+	margin-inline: auto;
+	padding-inline: var(--space-4);
+}
+
+/* List settings styles are local to the viewer. */
+.lobster-workflows__content {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: 1120px;
+	margin-inline: auto;
+	padding: var(--space-3) var(--space-4) var(--space-8);
+	gap: var(--space-4);
+}
+
+.lobster-workflows__panel {
+	background: var(--card);
+	border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+	border-radius: var(--radius-lg);
+	overflow: hidden;
+	min-width: 0;
+}
+
+.lobster-workflows__search {
+	position: relative;
+	min-width: 0;
+}
+
+.lobster-workflows__search svg {
+	position: absolute;
+	left: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 14px;
+	height: 14px;
+	color: var(--muted);
+	pointer-events: none;
+}
+
+.lobster-workflows__search input {
+	padding-left: 32px;
+}
+
+.lobster-workflows__search input:focus,
+.lobster-workflows__search input:focus-visible {
+	outline: none;
+	border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+	background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+}
+
+.lobster-workflows__columns,
+.lobster-workflows__link {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(100px, 0.25fr);
+	gap: var(--space-3);
+	align-items: center;
+	padding: var(--space-2) var(--space-4);
+}
+
+.lobster-workflows__columns {
+	color: var(--muted);
+	font-size: var(--control-ui-text-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.lobster-workflows__list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.lobster-workflows__item + .lobster-workflows__item {
+	border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.lobster-workflows__link {
+	min-height: 44px;
+	color: var(--text);
+	text-decoration: none;
+	transition: background var(--duration-fast) var(--ease-out);
+}
+
+.lobster-workflows__link:hover,
+.lobster-workflows__link:focus-visible {
+	background: var(--bg-hover);
+	text-decoration: none;
+}
+
+.lobster-workflows__link:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
+.lobster-workflows__copy {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.lobster-workflows__name,
+.lobster-workflows__description {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.lobster-workflows__name {
+	color: var(--text-strong);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.lobster-workflows__description {
+	color: var(--muted);
+	font-size: var(--control-ui-text-xs);
+}
+
+.lobster-workflows__source {
+	color: var(--text);
+	font-size: 12.5px;
+}
+
+.lobster-workflows__status {
+	padding: var(--space-5) var(--space-4);
+	margin: 0;
+	color: var(--muted);
+	text-align: center;
+	font-size: var(--control-ui-text-sm);
+}
+
+.lobster-workflows__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	padding: var(--space-2) var(--space-4);
+	border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+	font-size: var(--control-ui-text-sm);
+}
+
+.lobster-workflows__footer[hidden] {
+	display: none;
+}
+
+.lobster-workflows__load-more {
+	align-self: flex-start;
+}
+
+.lobster-workflows__count {
+	color: var(--muted);
+}
+
+@media (max-width: 640px) {
+	.lobster-workflows__footer {
+		flex-wrap: wrap;
+	}
+}
+
+.lobster-graph {
+	position: relative;
+	display: grid;
+	grid-template-rows: auto minmax(0, 1fr);
+	height: calc(100dvh - var(--lobster-graph-top, 16px) - 32px);
+	min-height: 320px;
+	width: 100%;
+	overflow: hidden;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	background: var(--bg);
+}
+
+.lobster-graph__header {
+	display: flex;
+	align-items: center;
+	gap: var(--space-4);
+	padding: var(--space-4);
+	border-bottom: 1px solid var(--border);
+	background: var(--card);
+	z-index: 1;
+}
+
+.lobster-graph__heading {
+	min-width: 0;
+	flex: 1;
+	overflow-wrap: anywhere;
+}
+
+.lobster-graph__heading .page-title {
+	margin: 0;
+	font-size: var(--control-ui-text-lg);
+}
+
+.lobster-graph__heading .page-subtitle {
+	margin: var(--space-1) 0 0;
+}
+
+.lobster-graph__canvas {
+	grid-area: 2 / 1;
+	min-height: 0;
+	min-width: 0;
+}
+
+.lobster-graph__flow {
+	height: 100%;
+}
+
+.lobster-subworkflow-portal {
+	display: contents;
+}
+
+.lobster-subworkflow {
+	height: min(80dvh, 900px);
+	min-height: 0;
+	width: 100%;
+}
+
+.lobster-subworkflow > .lobster-graph {
+	height: 100%;
+	min-height: 0;
+}
+
+.lobster-subworkflow--error {
+	height: auto;
+	padding: var(--space-6);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	background: var(--card);
+}
+
+.lobster-graph__step--interactive {
+	cursor: pointer;
+	/* Read-only React Flow nodes disable pointer events on their wrappers. */
+	pointer-events: auto;
+}
+
+.lobster-graph__step--interactive:is(:hover, :focus-visible) {
+	outline: 2px solid var(--text);
+	outline-offset: 3px;
+}
+
+.lobster-graph__code-view {
+	grid-area: 2 / 1;
+	display: grid;
+	grid-template-columns: clamp(180px, 23%, 280px) minmax(0, 1fr);
+	min-height: 0;
+	min-width: 0;
+	overflow: hidden;
+	background: var(--bg);
+	z-index: 1;
+}
+
+.lobster-graph__code-view[hidden],
+.lobster-source__editor [hidden] {
+	display: none;
+}
+
+.lobster-source__sidebar {
+	min-width: 0;
+	overflow: auto;
+	padding: var(--space-3) var(--space-2);
+	border-right: 1px solid var(--border);
+	background: var(--card);
+}
+
+.lobster-source__heading {
+	margin: 0 var(--space-2) var(--space-3);
+	color: var(--muted);
+	font-size: var(--control-ui-text-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.lobster-source__tree ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.lobster-source__tree ul ul {
+	padding-left: var(--space-3);
+	margin-left: var(--space-2);
+	border-left: 1px solid var(--border);
+}
+
+.lobster-source__tree :is(summary, button) {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+	min-height: 32px;
+	width: 100%;
+	padding: var(--space-1) var(--space-2);
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	font-size: var(--control-ui-text-sm);
+	text-align: left;
+	cursor: default;
+}
+
+.lobster-source__tree summary {
+	list-style: none;
+}
+
+.lobster-source__tree summary::-webkit-details-marker {
+	display: none;
+}
+
+.lobster-source__tree summary::before {
+	content: "›";
+	color: var(--muted);
+	width: 8px;
+	flex-shrink: 0;
+}
+
+.lobster-source__tree details[open] > summary::before {
+	transform: rotate(90deg);
+}
+
+.lobster-source__tree :is(summary, button):hover {
+	background: var(--bg-hover);
+}
+
+.lobster-source__tree :is(summary, button):focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
+.lobster-source__tree button[aria-current] {
+	background: var(--accent-subtle);
+	color: var(--accent);
+}
+
+.lobster-source__tree svg {
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+}
+
+.lobster-source__tree span {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.lobster-source__notice {
+	padding: 0 var(--space-2);
+	color: var(--muted);
+	font-size: var(--control-ui-text-xs);
+}
+
+.lobster-source__editor {
+	display: grid;
+	grid-template-rows: auto minmax(0, 1fr);
+	min-width: 0;
+	min-height: 0;
+}
+
+.lobster-source__filename {
+	padding: var(--space-3) var(--space-5);
+	border-bottom: 1px solid var(--border);
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: var(--control-ui-text-xs);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.lobster-source__message {
+	grid-area: 2 / 1;
+	align-self: start;
+	margin: 0;
+	padding: var(--space-5);
+	color: var(--muted);
+}
+
+.lobster-graph__code {
+	grid-area: 2 / 1;
+	min-width: 0;
+	min-height: 0;
+	overflow: auto;
+	padding: var(--space-5);
+	margin: 0;
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: var(--control-ui-text-sm);
+	line-height: 1.7;
+	white-space: pre;
+	tab-size: 2;
+}
+
+@media (max-width: 640px) {
+	.lobster-graph__code-view {
+		grid-template-columns: minmax(120px, 32%) minmax(0, 1fr);
+	}
+
+	.lobster-graph__code,
+	.lobster-source__filename {
+		padding: var(--space-3);
+	}
+}
+
+.lobster-graph .hljs-attr {
+	color: var(--hljs-attribute);
+}
+
+.lobster-graph .hljs-string {
+	color: var(--hljs-string);
+}
+
+.lobster-graph :is(.hljs-keyword, .hljs-subst) {
+	color: var(--hljs-keyword);
+}
+
+.lobster-graph .hljs-title {
+	color: var(--hljs-title);
+}
+
+.lobster-graph :is(.hljs-number, .hljs-literal, .hljs-variable) {
+	color: var(--hljs-number);
+}
+
+.lobster-graph .hljs-comment {
+	color: var(--muted);
+	font-style: italic;
+}
+
+.lobster-graph :is(.hljs-bullet, .hljs-type, .hljs-built_in) {
+	color: var(--hljs-type);
+}
+
+.lobster-graph .hljs-meta {
+	color: var(--hljs-meta);
+}
+
+.lobster-graph .react-flow {
+	--xy-background-color: var(--bg);
+	--xy-background-pattern-dots-color: var(--border-strong);
+	--xy-edge-stroke: var(--muted);
+	--xy-edge-stroke-width: 1.5;
+	--xy-edge-stroke-selected: var(--accent);
+	--xy-edge-label-color: var(--text);
+	--xy-edge-label-background-color: var(--bg);
+	--xy-node-color: var(--text);
+	--xy-node-background-color: var(--card);
+	--xy-node-border: 1px solid var(--border-strong);
+	--xy-node-border-radius: var(--radius-lg);
+	--xy-handle-background-color: var(--accent);
+	--xy-handle-border-color: var(--card);
+	--xy-controls-button-background-color: var(--card);
+	--xy-controls-button-background-color-hover: var(--bg-hover);
+	--xy-controls-button-color: var(--text);
+	--xy-controls-button-color-hover: var(--text-strong);
+	--xy-controls-button-border-color: var(--border);
+	--xy-controls-box-shadow: var(--shadow-sm);
+	--xy-attribution-background-color: var(--card);
+}
+
+.lobster-graph__edge-label {
+	position: absolute;
+	box-sizing: border-box;
+	width: max-content;
+	max-width: 180px;
+	padding: var(--space-1) var(--space-2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	background: var(--bg);
+	color: var(--text);
+	font-size: var(--control-ui-text-sm);
+	line-height: 1.4;
+	text-align: center;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+/* Compound nodes have a background behind their child edges and labels. */
+.lobster-graph .react-flow__edgelabel-renderer {
+	z-index: 2;
+}
+
+.lobster-graph__edge-measurements {
+	position: absolute;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+.lobster-graph__edge-measurements .lobster-graph__edge-label {
+	position: static;
+}
+
+/* React Flow needs handles to resolve edges; Dagre owns their visible endpoints. */
+.lobster-graph__step .react-flow__handle {
+	visibility: hidden;
+}
+
+.lobster-graph__step {
+	--lobster-node-color: var(--muted);
+	--lobster-node-border: color-mix(in srgb, var(--lobster-node-color) 65%, var(--border-strong));
+
+	position: relative;
+	width: 340px;
+	padding: var(--space-4);
+	border: 1px solid var(--lobster-node-border);
+	border-radius: var(--radius-lg);
+	background: var(--card);
+	color: var(--text);
+	box-shadow: var(--shadow-sm);
+	text-align: left;
+	overflow-wrap: anywhere;
+}
+
+.lobster-graph__step--pipeline {
+	--lobster-node-color: var(--info);
+}
+
+.lobster-graph__step--workflow {
+	--lobster-node-color: var(--hljs-title);
+
+	border-style: double;
+	border-width: 3px;
+	padding: calc(var(--space-4) - 2px);
+}
+
+.lobster-graph__step--parallel {
+	--lobster-node-color: var(--accent-2);
+
+	border-style: dashed;
+}
+
+.lobster-graph__step--join {
+	--lobster-node-color: var(--accent-2);
+
+	border-width: 2px;
+	padding: calc(var(--space-4) - 1px);
+}
+
+.lobster-graph__step--for_each {
+	--lobster-node-color: var(--accent);
+
+	border-style: dotted;
+}
+
+.lobster-graph__step--container {
+	box-sizing: border-box;
+	width: 100%;
+	height: 100%;
+	min-width: 340px;
+	padding: 0;
+	background: color-mix(in srgb, var(--lobster-node-color) 4%, var(--bg));
+}
+
+.lobster-graph__loop-header {
+	box-sizing: border-box;
+	width: 340px;
+	padding: var(--space-4);
+}
+
+.lobster-graph__step--approval {
+	--lobster-node-color: var(--warn);
+}
+
+.lobster-graph__step--input {
+	--lobster-node-color: var(--ok);
+}
+
+.lobster-input {
+	pointer-events: auto;
+	max-height: 680px;
+	overflow: auto;
+	overscroll-behavior: contain;
+	overflow-wrap: anywhere;
+	margin-top: var(--space-3);
+	padding-top: var(--space-3);
+	border-top: 1px solid var(--border);
+	font-size: var(--control-ui-text-sm);
+}
+
+.lobster-input__prompt {
+	margin: 0 0 var(--space-4);
+	line-height: 1.5;
+}
+
+.lobster-input__field + .lobster-input__field {
+	margin-top: var(--space-4);
+}
+
+.lobster-input__label {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-2);
+	margin-bottom: var(--space-2);
+	color: var(--text-strong);
+	font-weight: 500;
+}
+
+.lobster-input__required {
+	color: var(--lobster-node-color);
+}
+
+.lobster-input__type {
+	max-width: 60%;
+	padding: var(--space-1) var(--space-2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: var(--control-ui-text-xs);
+	font-weight: 400;
+}
+
+.lobster-input__control {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	min-height: 36px;
+	padding: var(--space-2) var(--space-3);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-md);
+	background: var(--bg);
+	color: var(--muted);
+}
+
+.lobster-input__control svg {
+	flex-shrink: 0;
+}
+
+.lobster-input__select {
+	overflow: hidden;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-md);
+	background: var(--bg);
+}
+
+.lobster-input__select .lobster-input__control {
+	border: 0;
+	border-bottom: 1px solid var(--border);
+	border-radius: 0;
+}
+
+.lobster-input__options {
+	display: grid;
+	gap: var(--space-1);
+	margin: 0;
+	padding: var(--space-2);
+	list-style: none;
+}
+
+.lobster-input__options li {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-2);
+	line-height: 1.5;
+}
+
+.lobster-input__option-mark {
+	flex: 0 0 10px;
+	height: 10px;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-full);
+}
+
+.lobster-input__description,
+.lobster-input__hint {
+	margin: var(--space-2) 0;
+	color: var(--muted);
+	font-size: var(--control-ui-text-xs);
+	line-height: 1.5;
+}
+
+.lobster-input__hint {
+	margin-bottom: 0;
+}
+
+.lobster-input__raw {
+	white-space: pre-wrap;
+	font-size: var(--control-ui-text-sm);
+}
+
+.lobster-input__group {
+	margin: var(--space-3) 0;
+	padding-left: var(--space-3);
+	border-left: 2px solid var(--border-strong);
+}
+
+.lobster-input__group-label {
+	margin: 0 0 var(--space-3);
+	color: var(--muted);
+	font-size: var(--control-ui-text-xs);
+	font-weight: 500;
+}
+
+.lobster-input__constraints {
+	margin: var(--space-2) 0;
+	font-size: var(--control-ui-text-xs);
+	color: var(--muted);
+}
+
+.lobster-input__constraints > div {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: var(--space-2);
+	padding: var(--space-1) 0;
+}
+
+.lobster-input__constraints dt {
+	font-family: var(--mono);
+}
+
+.lobster-input__constraints dd {
+	margin: 0;
+	white-space: pre-wrap;
+}
+
+.lobster-input__remaining {
+	margin-top: var(--space-2);
+}
+
+.lobster-input__remaining summary {
+	cursor: pointer;
+}
+
+.lobster-input__more {
+	margin: var(--space-2);
+}
+
+.lobster-graph__step-header {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.lobster-graph__file-link {
+	pointer-events: auto;
+	display: inline;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--accent);
+	font: inherit;
+	text-align: inherit;
+	white-space: inherit;
+	overflow-wrap: anywhere;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	cursor: pointer;
+}
+
+.lobster-graph__file-link:hover {
+	color: var(--text-strong);
+}
+
+.lobster-graph__file-link:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.lobster-graph__file-link span {
+	color: inherit;
+}
+
+.lobster-graph__step-kind {
+	flex-shrink: 0;
+	padding: var(--space-1) var(--space-2);
+	border: 1px solid var(--lobster-node-border);
+	border-radius: var(--radius-full);
+	background: color-mix(in srgb, var(--lobster-node-color) 10%, transparent);
+	color: var(--lobster-node-color);
+	font-size: var(--control-ui-text-xs);
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.lobster-graph__approval {
+	margin-top: var(--space-3);
+	color: var(--warn);
+	font-size: var(--control-ui-text-sm);
+}
+
+.lobster-graph__step-title {
+	flex: 1;
+	min-width: 0;
+	color: var(--text-strong);
+	font-weight: 600;
+}
+
+.lobster-graph__fields {
+	margin: 0;
+	font-size: var(--control-ui-text-sm);
+}
+
+.lobster-graph__field {
+	display: grid;
+	gap: var(--space-1);
+	margin-top: var(--space-3);
+	padding-top: var(--space-3);
+	border-top: 1px solid var(--border);
+}
+
+.lobster-graph__field dt {
+	color: var(--muted);
+	font-family: var(--mono);
+}
+
+.lobster-graph__field dd {
+	margin: 0;
+	white-space: pre-wrap;
+	line-height: 1.5;
+	tab-size: 2;
+}
+
+.lobster-graph__field code {
+	font-family: var(--mono);
+	font-size: inherit;
+}
+
+.lobster-graph__status {
+	position: absolute;
+	top: 45%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	max-width: 480px;
+	width: calc(100% - 48px);
+	color: var(--muted);
+	text-align: center;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+	.lobster-graph__header {
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+
+	.lobster-graph__heading {
+		order: -1;
+		flex-basis: 100%;
+	}
+}

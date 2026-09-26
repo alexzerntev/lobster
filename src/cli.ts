@@ -26,6 +26,12 @@ async function runCliWithSignal(
 	signal: AbortSignal,
 	forceTerminationSignal: AbortSignal = signal,
 ) {
+	if (argv[0] === "view" || (argv[0] === "help" && argv[1] === "view")) {
+		const { handleView } = await import("./cli_view.js");
+		await handleView({ argv: argv[0] === "view" ? argv.slice(1) : ["--help"], signal });
+		return;
+	}
+
 	const registry = createDefaultRegistry();
 
 	if (argv[0] === "graph") {
@@ -132,7 +138,7 @@ async function handleGraph({ argv }) {
 	}
 
 	if (!isWorkflowGraphFormat(parsed.format)) {
-		process.stderr.write("graph --format must be one of: mermaid, dot, ascii\n");
+		process.stderr.write("graph --format must be one of: mermaid, dot, ascii, json\n");
 		process.exitCode = 2;
 		return;
 	}
@@ -176,7 +182,7 @@ async function handleGraph({ argv }) {
 }
 
 function isWorkflowGraphFormat(value: string): value is WorkflowGraphFormat {
-	return value === "mermaid" || value === "dot" || value === "ascii";
+	return value === "mermaid" || value === "dot" || value === "ascii" || value === "json";
 }
 
 async function handleRun({
@@ -706,6 +712,8 @@ function helpText() {
 		`  lobster graph --file path/to/workflow.lobster --format mermaid\n` +
 		`  lobster graph --file path/to/workflow.lobster --format dot\n` +
 		`  lobster graph --file path/to/workflow.lobster --format ascii\n` +
+		`  lobster graph --file path/to/workflow.lobster --format json\n` +
+		`  lobster view [--workspace <directory>] [--port <port>]\n` +
 		`  lobster resume --token <token> --approve yes|no\n` +
 		`  lobster resume --token <token> --response-json '{...}'\n` +
 		`  lobster resume --token <token> --cancel\n` +
@@ -721,7 +729,7 @@ function helpText() {
 		`  lobster 'exec --json "echo [1,2,3]" | json'\n` +
 		`  lobster run --mode tool 'exec --json "echo [1]" | approve --prompt "ok?"'\n\n` +
 		`Commands:\n` +
-		`  exec, head, json, pick, table, where, approve, ask, openclaw.agent, openclaw.invoke, llm.invoke, llm_task.invoke, state.get, state.set, diff.last, commands.list, workflows.list, workflows.run, graph\n`
+		`  exec, head, json, pick, table, where, approve, ask, openclaw.agent, openclaw.invoke, llm.invoke, llm_task.invoke, state.get, state.set, diff.last, commands.list, workflows.list, workflows.run, graph, view\n`
 	);
 }
 
@@ -729,11 +737,11 @@ function graphHelpText() {
 	return (
 		`lobster graph — render workflow step graphs\n\n` +
 		`Usage:\n` +
-		`  lobster graph --file path/to/workflow.lobster [--format mermaid|dot|ascii] [--args-json '{...}']\n` +
-		`  lobster graph path/to/workflow.lobster [--format mermaid|dot|ascii]\n\n` +
+		`  lobster graph --file path/to/workflow.lobster [--format mermaid|dot|ascii|json] [--args-json '{...}']\n` +
+		`  lobster graph path/to/workflow.lobster [--format mermaid|dot|ascii|json]\n\n` +
 		`Flags:\n` +
 		`  --file       Workflow file path (.lobster, .yaml, .yml, .json)\n` +
-		`  --format     Output format: mermaid (default), dot, ascii\n` +
+		`  --format     Output format: mermaid (default), dot, ascii, json\n` +
 		`  --args-json  JSON object used to resolve workflow args for labels\n`
 	);
 }

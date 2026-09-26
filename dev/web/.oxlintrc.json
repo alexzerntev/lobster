@@ -1,0 +1,15 @@
+{
+	"extends": ["../../.oxlintrc.json"],
+	"overrides": [
+		{
+			"files": ["main.ts", "browser/**/*.ts"],
+			"env": {
+				"browser": true
+			}
+		}
+	],
+	"env": {
+		"node": true,
+		"es2022": true
+	}
+}

@@ -61,5 +61,26 @@ jobs:
       - name: Lint and check formatting
         run: pnpm lint
 
+      - name: Typecheck engine and viewer
+        run: pnpm typecheck
+
       - name: Test
         run: pnpm test
+
+      - name: Install viewer test browser
+        if: matrix.node == 24
+        run: pnpm --filter @lobster/dev-web exec playwright install --with-deps chromium --only-shell
+
+      - name: Check live viewer themes
+        if: matrix.node == 24
+        run: pnpm test:web:browser
+
+      - name: Check installable viewer library
+        run: pnpm test:viewer-package
+
+      - name: Check installed standalone CLI
+        run: pnpm test:view-package
+
+      - name: Check built standalone viewer
+        if: matrix.node == 24
+        run: pnpm --filter @lobster/dev-web test:browser:built
