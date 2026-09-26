@@ -353,16 +353,25 @@ content. A declared Content-Length over the limit is also rejected immediately.
 Tool dispatch remains non-retryable after an overflow, as with other
 post-dispatch errors; `llm.invoke` retains its existing retry policy.
 
+## Workflow viewer
+
+Run `lobster view --workspace /path/to/project` and open the printed local URL.
+The read-only viewer provides search, pagination, flow graphs, child workflow
+dialogs, and highlighted source with a file tree. It reads the workspace's
+`workflows/` directory and watches changes automatically; viewing never runs
+workflows. The default workspace is the current directory and the default port
+is 5180 (`--port` overrides it). Ctrl+C stops the server and watcher.
+
+The installed CLI includes built assets and needs no OpenClaw or development
+server. OpenClaw's existing plugin embeds the same [viewer library](ui/README.md).
+
 ## Development
 
-The read-only workflow viewer provides search, pagination, flow graphs, child
-workflow dialogs, and highlighted source with a file tree. Start it with
-`pnpm dev:web`; see [UI development](dev/web/README.md) for prerequisites and
-maintenance. The local server reloads source edits and watches workflow files automatically.
-No OpenClaw installation is needed; the viewer/server are excluded from the
-published runtime. OpenClaw’s existing Lobster plugin consumes the
-[viewer library](ui/README.md).
+Use `pnpm dev:web` for the same viewer with source hot reload and checked-in
+examples. `pnpm build` builds the CLI and standalone assets; `pnpm build:viewer`
+builds the embeddable library. See [UI development](dev/web/README.md) for checks
+and maintenance.
 
-The runtime is one TypeScript package; `ui` owns the reusable workflow viewer and `dev/web` owns its development-only server. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
+The runtime is one TypeScript package; `ui` owns the reusable viewer, inspection API, and standalone host; `dev/web` supplies development tooling. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
 
 Run `pnpm build`, `pnpm test`, `pnpm typecheck`, and `pnpm lint` before submitting changes. Engine tests compile into `dist/test` and use Node's test runner; platform-specific process tests run only where their OS primitives exist. Dependencies observe the two-day release-age policy in `pnpm-workspace.yaml`.

@@ -1,4 +1,4 @@
-import { WorkflowViewError, workflowErrorMessage } from "../../ui/src/workflow-errors.js";
+import { WorkflowViewError, workflowErrorMessage } from "../src/workflow-errors.js";
 import {
 	type LobsterPageTarget,
 	type LobsterHostTheme,
@@ -10,7 +10,7 @@ import type {
 	LobsterWorkflowResult,
 	LobsterWorkflowsResult,
 } from "@clawdbot/lobster-viewer";
-import { mountDevelopmentDialog } from "./dialog.js";
+import { mountStandaloneDialog } from "./dialog.js";
 
 type WorkflowTransport = {
 	list: (signal: AbortSignal) => Promise<LobsterWorkflowsResult>;
@@ -21,9 +21,9 @@ type WorkflowTransport = {
 
 const messages = {
 	params: "Select a workflow or a source file from its tree.",
-	page: "This page is not supported by the development preview.",
-	pageParams: "Invalid development page parameters. Select a workflow from the list.",
-	disconnected: "The development server is disconnected. Check that it is running and retry.",
+	page: "This page is not supported by the standalone viewer.",
+	pageParams: "Invalid viewer page parameters. Select a workflow from the list.",
+	disconnected: "The viewer server is disconnected. Check that it is running and retry.",
 };
 
 function hasKeys(value: unknown, allowed: readonly string[]): value is Record<string, unknown> {
@@ -55,7 +55,7 @@ function pageHref(target: LobsterPageTarget): string {
 }
 
 /** The server marks only known, sanitized workflow errors as safe to display. */
-export async function readPreview(url: string, signal: AbortSignal) {
+export async function readWorkflowResponse(url: string, signal: AbortSignal) {
 	const response = await fetch(url, { signal, credentials: "omit" });
 	const body = await response.json();
 	if (!response.ok) {
@@ -68,7 +68,7 @@ export async function readPreview(url: string, signal: AbortSignal) {
 }
 
 /** Local reads, navigation, and view lifetimes; no workflow execution transport. */
-export function createDevelopmentHost({
+export function createStandaloneHost({
 	transport,
 	navigate,
 	theme,
@@ -156,7 +156,7 @@ export function createDevelopmentHost({
 				components: {
 					mountDialog(container, props) {
 						assertActive();
-						return mountDevelopmentDialog(container, props, lifetime.signal);
+						return mountStandaloneDialog(container, props, lifetime.signal);
 					},
 				},
 				connection: {

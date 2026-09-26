@@ -1,5 +1,5 @@
 /* The host owns modal geometry; the embedded view owns the panel and contents. */
-.lobster-dev-dialog {
+.lobster-standalone-dialog {
 	--lobster-modal-height-limit: var(--lobster-modal-max-height, calc(100dvh - 48px));
 	width: min(var(--lobster-modal-width, 540px), calc(100vw - 48px));
 	max-width: var(--lobster-modal-max-width, calc(100vw - 48px));
@@ -11,13 +11,13 @@
 	overflow: visible;
 }
 
-.lobster-dev-dialog::backdrop {
+.lobster-standalone-dialog::backdrop {
 	background: var(--wa-color-overlay-modal, color-mix(in srgb, var(--text) 12%, transparent));
 	backdrop-filter: var(--lobster-modal-backdrop-filter, blur(4px));
 }
 
 @media (max-width: 640px) {
-	.lobster-dev-dialog {
+	.lobster-standalone-dialog {
 		--lobster-modal-height-limit: 90dvh;
 		width: min(var(--lobster-modal-width, 540px), calc(100vw - 24px));
 		max-width: var(--lobster-modal-max-width, calc(100vw - 24px));

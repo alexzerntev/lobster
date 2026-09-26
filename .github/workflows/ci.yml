@@ -77,3 +77,10 @@ jobs:
 
       - name: Check installable viewer library
         run: pnpm test:viewer-package
+
+      - name: Check installed standalone CLI
+        run: pnpm test:view-package
+
+      - name: Check built standalone viewer
+        if: matrix.node == 24
+        run: pnpm --filter @lobster/dev-web test:browser:built

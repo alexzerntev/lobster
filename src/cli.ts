@@ -26,6 +26,12 @@ async function runCliWithSignal(
 	signal: AbortSignal,
 	forceTerminationSignal: AbortSignal = signal,
 ) {
+	if (argv[0] === "view" || (argv[0] === "help" && argv[1] === "view")) {
+		const { handleView } = await import("./cli_view.js");
+		await handleView({ argv: argv[0] === "view" ? argv.slice(1) : ["--help"], signal });
+		return;
+	}
+
 	const registry = createDefaultRegistry();
 
 	if (argv[0] === "graph") {
@@ -707,6 +713,7 @@ function helpText() {
 		`  lobster graph --file path/to/workflow.lobster --format dot\n` +
 		`  lobster graph --file path/to/workflow.lobster --format ascii\n` +
 		`  lobster graph --file path/to/workflow.lobster --format json\n` +
+		`  lobster view [--workspace <directory>] [--port <port>]\n` +
 		`  lobster resume --token <token> --approve yes|no\n` +
 		`  lobster resume --token <token> --response-json '{...}'\n` +
 		`  lobster resume --token <token> --cancel\n` +
@@ -722,7 +729,7 @@ function helpText() {
 		`  lobster 'exec --json "echo [1,2,3]" | json'\n` +
 		`  lobster run --mode tool 'exec --json "echo [1]" | approve --prompt "ok?"'\n\n` +
 		`Commands:\n` +
-		`  exec, head, json, pick, table, where, approve, ask, openclaw.agent, openclaw.invoke, llm.invoke, llm_task.invoke, state.get, state.set, diff.last, commands.list, workflows.list, workflows.run, graph\n`
+		`  exec, head, json, pick, table, where, approve, ask, openclaw.agent, openclaw.invoke, llm.invoke, llm_task.invoke, state.get, state.set, diff.last, commands.list, workflows.list, workflows.run, graph, view\n`
 	);
 }
 

@@ -3,8 +3,8 @@ import type { LobsterViewContext } from "@clawdbot/lobster-viewer";
 type MountDialog = LobsterViewContext["host"]["components"]["mountDialog"];
 type DialogProps = Parameters<MountDialog>[1];
 
-/** Native modal used by the development shell; the viewer owns its content. */
-export function mountDevelopmentDialog(
+/** Native modal used by the standalone shell; the viewer owns its content. */
+export function mountStandaloneDialog(
 	container: HTMLElement,
 	props: DialogProps,
 	signal: AbortSignal,
@@ -70,7 +70,7 @@ export function mountDevelopmentDialog(
 	dialog.addEventListener("close", restoreFocus);
 	signal.addEventListener("abort", dispose, { once: true });
 	try {
-		dialog.className = "lobster-dev-dialog";
+		dialog.className = "lobster-standalone-dialog";
 		dialog.style.cssText = props.style ?? "";
 		dialog.setAttribute("aria-label", props.label);
 		dialog.append(props.content);

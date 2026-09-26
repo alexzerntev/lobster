@@ -172,6 +172,9 @@ importers:
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
+      chokidar:
+        specifier: 5.0.0
+        version: 5.0.0
       yaml:
         specifier: ^2.9.1
         version: 2.9.1

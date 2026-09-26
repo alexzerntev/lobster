@@ -1,16 +1,16 @@
-import "../../ui/theme/theme.css";
+import "../theme/theme.css";
 import {
 	mountWorkflows,
 	mountWorkflow,
 	observeHostTheme,
 	type LobsterViewContext,
 } from "@clawdbot/lobster-viewer";
-import { createDevelopmentHost, readPreview } from "./preview-host.js";
+import { createStandaloneHost, readWorkflowResponse } from "./host.js";
 import "./shell.css";
 
 const app = document.querySelector<HTMLElement>("#app")!;
 const options = new URLSearchParams(location.search);
-const forcedOffline = options.get("host") === "offline";
+const forcedOffline = import.meta.env.DEV && options.get("host") === "offline";
 let lifetime: AbortController | undefined;
 let disposeView: (() => void) | undefined;
 let disposeHost: (() => void) | undefined;
@@ -30,14 +30,15 @@ const syncTheme = () => {
 };
 systemTheme.addEventListener("change", syncTheme);
 syncTheme();
-const preview = createDevelopmentHost({
+const standalone = createStandaloneHost({
 	theme: observeHostTheme(document.documentElement, appearance.signal),
 	transport: {
-		list: (signal) => readPreview("/api/workflows", signal),
-		get: (id, signal) => readPreview(`/api/workflow?id=${encodeURIComponent(id)}`, signal),
-		files: (id, signal) => readPreview(`/api/workflow/files?id=${encodeURIComponent(id)}`, signal),
+		list: (signal) => readWorkflowResponse("/api/workflows", signal),
+		get: (id, signal) => readWorkflowResponse(`/api/workflow?id=${encodeURIComponent(id)}`, signal),
+		files: (id, signal) =>
+			readWorkflowResponse(`/api/workflow/files?id=${encodeURIComponent(id)}`, signal),
 		file: (id, path, signal) =>
-			readPreview(
+			readWorkflowResponse(
 				`/api/workflow/file?id=${encodeURIComponent(id)}&path=${encodeURIComponent(path)}`,
 				signal,
 			),
@@ -53,7 +54,7 @@ const render = () => {
 	disposeHost?.();
 	app.replaceChildren();
 	lifetime = new AbortController();
-	const view = preview.createView(lifetime.signal);
+	const view = standalone.createView(lifetime.signal);
 	disposeHost = view.dispose;
 	const detail = location.pathname === "/workflow";
 	const context: LobsterViewContext = {
@@ -64,7 +65,7 @@ const render = () => {
 	};
 	disposeView = (detail ? mountWorkflow : mountWorkflows)(app, context)?.dispose;
 };
-const notifyChanges = () => preview.emitWorkflowsChanged();
+const notifyChanges = () => standalone.emitWorkflowsChanged();
 const closeEvents = () => {
 	if (!events) return;
 	events.onopen = null;
@@ -80,10 +81,10 @@ const connectEvents = () => {
 	events = current;
 	current.onopen = () => {
 		retryDelay = 500;
-		preview.setConnection(!forcedOffline);
+		standalone.setConnection(!forcedOffline);
 	};
 	current.onerror = () => {
-		preview.setConnection(false);
+		standalone.setConnection(false);
 		// EventSource retries dropped streams itself, but a proxy 502 during a
 		// server restart closes it permanently. Only replace that terminal state.
 		if (current.readyState !== EventSource.CLOSED || reconnect !== undefined) return;
@@ -102,7 +103,7 @@ window.addEventListener("popstate", render);
 render();
 
 // Replacement owns one event stream and no listeners from an earlier mount.
-import.meta.hot?.dispose(() => {
+const dispose = () => {
 	disposed = true;
 	appearance.abort();
 	clearTimeout(reconnect);
@@ -110,8 +111,9 @@ import.meta.hot?.dispose(() => {
 	lifetime?.abort();
 	disposeView?.();
 	disposeHost?.();
-	preview.dispose();
+	standalone.dispose();
 	closeEvents();
 	window.removeEventListener("popstate", render);
 	systemTheme.removeEventListener("change", syncTheme);
-});
+};
+import.meta.hot?.dispose(dispose);

@@ -1,6 +1,7 @@
 # Lobster UI development
 
-The read-only viewer lives in `ui/`; `dev/web/` hosts it for development. It
+The read-only viewer and standalone host live in `ui/`; `dev/web/` supplies
+Vite and development fixtures. It
 provides workflow search and pagination (20 rows at a time), React Flow graphs,
 child-workflow dialogs, and highlighted source with a file tree. It uses the
 local engine without executing workflows or requiring OpenClaw or credentials.
@@ -14,6 +15,9 @@ Requires Node 22.22.2+ (22.x) or 24.15+ (24.x), pnpm 12.5.1 (pinned in
 pnpm install --frozen-lockfile
 pnpm dev:web          # Open http://127.0.0.1:5180; Ctrl+C to stop
 pnpm test:web         # API/host and viewer tests
+pnpm build            # CLI and built standalone assets
+node bin/lobster.js view --workspace dev/web/workspace --port 5181
+pnpm test:view-package # Install and exercise the packed CLI outside the checkout
 ```
 
 If the `pnpm` launcher is unavailable, use `corepack pnpm` for these commands.
@@ -44,9 +48,10 @@ Theme checks:
 ```sh
 pnpm --filter @lobster/dev-web exec playwright install chromium --only-shell
 pnpm test:web:browser
+pnpm --filter @lobster/dev-web test:browser:built # After pnpm build
 ```
 
-The browser suite exercises the real preview, computed colors, child dialogs,
+The browser suites exercise development and built hosts, computed colors, child dialogs,
 source selection, and viewport preservation; CI runs it on Node 24. Unit tests
 cover early host notifications, delayed stylesheets, and subscription disposal.
 OpenClaw owns its adapter and application-theme checks in its repository.
@@ -66,8 +71,12 @@ palette copy is not automatically synchronized upstream.
 - `ui/theme/`: shared tokens, controls, fonts, and artwork; preserve `NOTICE.md`.
 - `ui/server/`: shared bounded file reads and lifecycle-owned filesystem watching.
   Listing reads metadata; opening a workflow invokes the engine's validator and graph renderer.
-- `dev/web/server.ts`: development-only HTTP/SSE transport. `preview-host.ts`,
-  `dialog.ts`, and `main.ts` own local navigation and lifecycle.
+- `ui/standalone/`: shared local navigation, dialogs, theme, and HTTP/SSE transport.
+  `server.ts` serves built assets for `lobster view`; it shares the inspection API
+  and watcher with the Vite development host in `dev/web/server.ts`.
+- `dev/web/vite.config.ts`: builds the standalone browser assets and copies source
+  text and license notices. `pnpm build` and `pnpm test` prepare these assets so
+  packaging with lifecycle scripts disabled still includes a complete viewer.
 - OpenClaw’s `extensions/lobster/` owns plugin registration and its host adapter.
   It consumes the [viewer library](../../ui/README.md), with no development server.
 - `dev/web/workspace/workflows/`: checked-in synthetic examples shared with API
@@ -85,8 +94,9 @@ change retries the graph without reloading the page.
 The preview implements inspection/navigation only; unsupported host operations
 fail explicitly. Preserve stale-request protection and dispose subscriptions,
 requests, timers, dialogs, and views when replaced. One filesystem watcher serves
-one event stream per browser shell. The viewer library is packaged separately; `dev/web` stays private. Both are excluded
-from the engine runtime tarball; the server rejects `NODE_ENV=production`.
+all browser shells connected to each standalone server. The viewer library is
+packaged separately; the CLI includes built standalone assets and loads its server
+only for `view`. `dev/web` stays private; its Vite server rejects production mode.
 
 ## File boundaries
 
@@ -103,5 +113,6 @@ directories. Invalid workflow definitions remain inspectable in Code.
 The server binds to `127.0.0.1:5180` by default and runs with your account's
 filesystem permissions. Its API is read-only and does not execute workflow commands.
 `LOBSTER_WORKSPACE` selects a directory containing `workflows/`;
-`LOBSTER_WEB_HOST` / `LOBSTER_WEB_PORT` change the bind address and port.
+`LOBSTER_WEB_PORT` changes the development port. The CLI uses `--workspace`
+and `--port`; both hosts bind to loopback only.
 Keep personal data out of committed examples.

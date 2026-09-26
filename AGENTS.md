@@ -4,7 +4,7 @@ Guidance for coding assistants operating in this repository.
 
 ## Viewer Development
 
-- Keep the read-only viewer and shared inspection in `ui/`, the development harness in `dev/web/`, and the OpenClaw adapter in OpenClaw’s existing `extensions/lobster/` plugin. `ui/` packages the reusable viewer library; neither it nor the development harness ships in the CLI runtime package. Setup and checks: [dev/web/README.md](dev/web/README.md).
+- Keep the read-only viewer and shared inspection in `ui/`, the development harness in `dev/web/`, and the OpenClaw adapter in OpenClaw’s existing `extensions/lobster/` plugin. `ui/standalone/` owns the shared local host for `lobster view` and development. The CLI ships built viewer assets; the reusable library has separate browser/server exports. Development tooling and fixtures stay out of both published packages. Setup and checks: [dev/web/README.md](dev/web/README.md).
 - The engine owns graph node types in `src/workflows/graph-types.ts`. Update viewer handling and checked-in examples together when changing this contract.
 - Keep documentation changes concise and limited to changed features and maintenance requirements.
 

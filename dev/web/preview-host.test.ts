@@ -2,7 +2,7 @@ import type { LobsterPageTarget, LobsterHostTheme } from "@clawdbot/lobster-view
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { LobsterWorkflowFileResult } from "@clawdbot/lobster-viewer";
-import { createDevelopmentHost, readPreview } from "./preview-host.js";
+import { createStandaloneHost, readWorkflowResponse } from "../../ui/standalone/host.js";
 
 function fixture(theme: LobsterHostTheme = { colorMode: "light", subscribe: () => () => {} }) {
 	const requests: Array<{
@@ -12,7 +12,7 @@ function fixture(theme: LobsterHostTheme = { colorMode: "light", subscribe: () =
 		path?: string;
 	}> = [];
 	const navigations: string[] = [];
-	const owner = createDevelopmentHost({
+	const owner = createStandaloneHost({
 		theme,
 		transport: {
 			async list(signal) {
@@ -129,7 +129,7 @@ test("invalid workflow ids, source paths and page targets never reach transport 
 		{ id: "workflows", params: { agentId: "main" } },
 	];
 	for (const target of unsupportedPages) {
-		assert.throws(() => view.host.navigation.openPage(target), /development/);
+		assert.throws(() => view.host.navigation.openPage(target), /(?:viewer|standalone)/);
 	}
 	assert.deepEqual(requests, []);
 	assert.deepEqual(navigations, []);
@@ -180,7 +180,7 @@ test("connection changes, reconnects, and file events reach live subscriptions o
 test("navigation aborts pending source reads and rejects late results, even if transport ignores cancellation", async () => {
 	let complete!: (result: LobsterWorkflowFileResult) => void;
 	let transportSignal: AbortSignal | undefined;
-	const owner = createDevelopmentHost({
+	const owner = createStandaloneHost({
 		theme: { colorMode: "light", subscribe: () => () => {} },
 		transport: {
 			file(_id, _path, signal) {
@@ -249,7 +249,7 @@ test("known workflow API errors stay actionable and unknown failures do not expo
 		async () => new Response(JSON.stringify(body), { status: 400 }),
 	);
 	await assert.rejects(
-		readPreview("http://localhost/api/workflows", new AbortController().signal),
+		readWorkflowResponse("http://localhost/api/workflows", new AbortController().signal),
 		(error: unknown) => {
 			assert.equal(view.host.errorMessage(error), safeMessage);
 			return true;
@@ -262,7 +262,7 @@ test("known workflow API errors stay actionable and unknown failures do not expo
 	]) {
 		body = unknown;
 		await assert.rejects(
-			readPreview("http://localhost/api/workflows", new AbortController().signal),
+			readWorkflowResponse("http://localhost/api/workflows", new AbortController().signal),
 			(error: unknown) => {
 				assert.equal(view.host.errorMessage(error).includes(privateMessage), false);
 				assert.match(view.host.errorMessage(error), /Check the development server/);

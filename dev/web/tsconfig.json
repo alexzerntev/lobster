@@ -14,11 +14,11 @@
 		}
 	},
 	"include": [
-		"main.ts",
-		"preview-host.ts",
+		"../../ui/standalone/main.ts",
+		"../../ui/standalone/host.ts",
+		"../../ui/standalone/dialog.ts",
 		"preview-host.test.ts",
-		"dialog.ts",
 		"browser/**/*.ts",
-		"playwright.config.ts"
+		"playwright*.config.ts"
 	]
 }
