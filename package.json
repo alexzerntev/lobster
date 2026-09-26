@@ -59,7 +59,6 @@
 		"dev:web": "pnpm --filter @lobster/dev-web dev",
 		"test:web": "pnpm --filter @lobster/dev-web test && pnpm --filter @clawdbot/lobster-viewer test",
 		"test:web:browser": "pnpm --filter @lobster/dev-web test:browser",
-		"test:theme:openclaw": "pnpm --filter @lobster/dev-web test:theme:openclaw",
 		"build:viewer": "pnpm --filter @clawdbot/lobster-viewer build",
 		"test:viewer-package": "pnpm --filter @clawdbot/lobster-viewer test:package"
 	},

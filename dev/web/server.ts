@@ -22,7 +22,7 @@ const server = await createServer({
 	mode: "development",
 	publicDir: false,
 	root,
-	// A browser check can run alongside the developer's preview with different host assets.
+	// Browser checks can run alongside the developer's preview.
 	cacheDir: path.join(root, "node_modules/.vite", String(port)),
 	optimizeDeps: { entries: ["index.html"] },
 	resolve: {
@@ -38,9 +38,6 @@ const server = await createServer({
 		},
 	},
 	plugins: [
-		...(process.env.LOBSTER_OPENCLAW_ROOT
-			? [(await import("./theme-check/plugin.js")).createOpenClawThemeCheck()]
-			: []),
 		{
 			name: "lobster-development-api",
 			configureServer(vite) {

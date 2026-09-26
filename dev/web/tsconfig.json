@@ -19,7 +19,6 @@
 		"preview-host.test.ts",
 		"dialog.ts",
 		"browser/**/*.ts",
-		"theme-check/**/*.ts",
 		"playwright.config.ts"
 	]
 }

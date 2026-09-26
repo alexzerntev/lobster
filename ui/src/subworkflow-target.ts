@@ -23,7 +23,7 @@ function hasUnsafeCharacter(value: string): boolean {
 function workflowFilename(filename: string): boolean {
 	const parts = filename.split("/");
 	const bytes = encoder.encode(filename);
-	// These are the source catalog's portable path limits. The get RPC still owns
+	// These are the source catalog's portable path limits. The inspection API owns
 	// authoritative file access, including symlink, hardlink, and size checks.
 	return (
 		bytes.length <= maxPathBytes &&

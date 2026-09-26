@@ -1,8 +1,8 @@
 # Lobster workflow viewer
 
-`@clawdbot/lobster-viewer` is an embeddable, read-only library, not an OpenClaw
-plugin or a web server. OpenClaw's existing `extensions/lobster/` plugin owns
-its registration, navigation, gateway transport, and service lifetime.
+`@clawdbot/lobster-viewer` provides embeddable workflow views and a read-only
+inspection API. Hosts supply navigation, transport, and service lifetime;
+OpenClaw's adapter lives in its existing `extensions/lobster/` plugin.
 
 - Import `mountWorkflows`, `mountWorkflow`, and the `LobsterViewContext` host
   contract from `@clawdbot/lobster-viewer`; import its `styles.css` separately.

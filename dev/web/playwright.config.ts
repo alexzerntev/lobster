@@ -8,10 +8,7 @@ export default defineConfig({
 	forbidOnly: Boolean(process.env.CI),
 	retries: 0,
 	use: { baseURL: "http://127.0.0.1:5192", viewport: { width: 1280, height: 900 } },
-	projects: [
-		{ name: "standalone", testMatch: "theme.spec.ts" },
-		{ name: "openclaw", testMatch: "openclaw-theme.spec.ts" },
-	],
+	testMatch: "theme.spec.ts",
 	webServer: {
 		command: "tsx server.ts",
 		url: "http://127.0.0.1:5192/api/health",

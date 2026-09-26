@@ -50,7 +50,7 @@ it("publishes rendered modes after early host notifications and late palette app
 	const stop = theme.subscribe(() => modes.push(theme.colorMode));
 	try {
 		expect(theme.colorMode).toBe("light");
-		notifyHost(); // OpenClaw can notify before a palette arrives.
+		notifyHost(); // A host can notify before a palette arrives.
 		expect(modes).toEqual([]);
 		root.style.colorScheme = "dark";
 		await Promise.resolve();
