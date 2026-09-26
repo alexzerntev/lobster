@@ -31,7 +31,6 @@ const server = await createServer({
 		fs: {
 			allow: [root, uiRoot],
 		},
-		watch: { usePolling: true, interval: 250 },
 	},
 	plugins: [
 		{

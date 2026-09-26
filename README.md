@@ -364,11 +364,11 @@ post-dispatch errors; `llm.invoke` retains its existing retry policy.
 
 The read-only workflow viewer provides search, pagination, flow graphs, child
 workflow dialogs, and highlighted source with a file tree. Start it with
-`./dev/web/dev up`; see [UI development](dev/web/README.md) for prerequisites and
-maintenance. Docker isolates the preview and syncs source edits automatically.
+`pnpm dev:web`; see [UI development](dev/web/README.md) for prerequisites and
+maintenance. The local server reloads source edits and watches workflow files automatically.
 No OpenClaw installation is needed; the viewer/server are excluded from the
 published runtime.
 
 The runtime is one TypeScript package; `ui` owns the private workflow viewer and `dev/web` owns its development-only server. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
 
-Run `pnpm build`, `pnpm test`, `pnpm typecheck`, and `pnpm lint` before submitting changes (`./dev/web/dev check` runs them in the Docker preview). Engine tests compile into `dist/test` and use Node's test runner; platform-specific process tests run only where their OS primitives exist. Dependencies observe the two-day release-age policy in `pnpm-workspace.yaml`.
+Run `pnpm build`, `pnpm test`, `pnpm typecheck`, and `pnpm lint` before submitting changes. Engine tests compile into `dist/test` and use Node's test runner; platform-specific process tests run only where their OS primitives exist. Dependencies observe the two-day release-age policy in `pnpm-workspace.yaml`.

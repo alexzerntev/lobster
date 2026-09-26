@@ -21,6 +21,3 @@ clawdbot_enhancement.md
 # Environment
 .env
 .env.local
-
-# Standalone development watcher
-dev/web/.watch.pid
