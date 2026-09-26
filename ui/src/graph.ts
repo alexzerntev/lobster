@@ -27,11 +27,7 @@ import {
 	useState,
 } from "react";
 import { createRoot } from "react-dom/client";
-import type {
-	LobsterSourceFile,
-	LobsterWorkflowDetail,
-	LobsterWorkflowResult,
-} from "../workflow-types.js";
+import type { LobsterSourceFile, LobsterWorkflowDetail } from "../workflow-types.js";
 import {
 	graphFor,
 	layoutWorkflowGraph,
@@ -572,9 +568,7 @@ function createWorkflowView(
 		status.textContent = "Loading workflow…";
 		page.setAttribute("aria-busy", "true");
 		try {
-			const result = await host.request<LobsterWorkflowResult>("lobster.workflows.get", {
-				id: workflowId,
-			});
+			const result = await host.workflows.get(workflowId);
 			if (disposed || signal.aborted || current !== generation) {
 				return;
 			}
@@ -591,7 +585,7 @@ function createWorkflowView(
 				try {
 					graph = graphFor(workflow);
 				} catch (error) {
-					flowError = `Could not render flow. ${host.redact(error instanceof Error ? error.message : String(error))} Select Code to inspect the definition.`;
+					flowError = `Could not render flow. ${host.errorMessage(error)} Select Code to inspect the definition.`;
 				}
 			}
 			if (flowError) {
@@ -611,7 +605,7 @@ function createWorkflowView(
 				return;
 			}
 			status.setAttribute("role", "alert");
-			status.textContent = `Could not load workflow. ${host.redact(error instanceof Error ? error.message : String(error))}`;
+			status.textContent = `Could not load workflow. ${host.errorMessage(error)}`;
 		} finally {
 			if (!disposed && !signal.aborted && current === generation) {
 				page.setAttribute("aria-busy", "false");

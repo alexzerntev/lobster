@@ -1,10 +1,14 @@
-import { parse as parseYaml } from "yaml";
+import { extractStepRefs } from "../../src/workflows/graph-model.js";
 import type { LobsterWorkflowDetail } from "../workflow-types.js";
+import { WorkflowViewError } from "./workflow-errors.js";
 
 const encoder = new TextEncoder();
 const maxPathBytes = 2048;
 const maxFieldBytes = 256 * 1024;
-const redactionMarker = /\*{3}|…|\[redacted\]|<redacted>/iu;
+
+export function isDynamicWorkflowPath(value: string): boolean {
+	return /\$\{[A-Za-z0-9_-]+\}/u.test(value) || extractStepRefs(value).length > 0;
+}
 
 function hasUnsafeCharacter(value: string): boolean {
 	return Array.from(value).some(
@@ -37,44 +41,33 @@ export function subworkflowTarget(
 ): { id: string; filename: string } {
 	const parentFilename = parent.definition?.filename;
 	if (parent.source !== "file" || !parentFilename || !workflowFilename(parentFilename)) {
-		throw new Error(
+		throw new WorkflowViewError(
 			"Cannot locate this workflow's source directory. Open a workspace workflow file to inspect its sub-workflows.",
 		);
 	}
-	const text = parent.steps
-		?.find((step) => step.id === nodeId)
-		?.fields.find((field) => field.name === "workflow")?.value;
-	if (text === undefined) {
-		throw new Error("This node has no sub-workflow path. Open Code to inspect its definition.");
-	}
-	if (text.length > maxFieldBytes || encoder.encode(text).length > maxFieldBytes) {
-		throw new Error(
-			"The sub-workflow field exceeds 256 KiB. Use a literal relative workflow path.",
-		);
-	}
-	let target: unknown;
-	try {
-		target = parseYaml(text, { maxAliasCount: 0 });
-	} catch {
-		throw new Error(
-			"The sub-workflow path is not a valid YAML string. Open Code and use a literal relative workflow path.",
+	const target = parent.steps?.find((step) => step.id === nodeId)?.workflow;
+	if (target === undefined) {
+		throw new WorkflowViewError(
+			"This node has no sub-workflow path. Open Code to inspect its definition.",
 		);
 	}
 	if (typeof target !== "string" || !target.trim()) {
-		throw new Error("The sub-workflow path must be a nonempty string. Open Code to inspect it.");
-	}
-	if (redactionMarker.test(target) || redactionMarker.test(parentFilename)) {
-		throw new Error(
-			"The sub-workflow path is redacted and cannot be resolved. Inspect the original workflow file locally.",
+		throw new WorkflowViewError(
+			"The sub-workflow path must be a nonempty string. Open Code to inspect it.",
 		);
 	}
-	if (target.includes("$")) {
-		throw new Error(
+	if (target.length > maxFieldBytes || encoder.encode(target).length > maxFieldBytes) {
+		throw new WorkflowViewError(
+			"The sub-workflow field exceeds 256 KiB. Use a literal relative workflow path.",
+		);
+	}
+	if (isDynamicWorkflowPath(target)) {
+		throw new WorkflowViewError(
 			"This sub-workflow path depends on runtime values. Open Code to inspect it; the viewer does not execute workflows.",
 		);
 	}
 	if (target.startsWith("/") || hasUnsafeCharacter(target)) {
-		throw new Error("Use a relative sub-workflow path inside workspace/workflows.");
+		throw new WorkflowViewError("Use a relative sub-workflow path inside workspace/workflows.");
 	}
 	const parts = parentFilename.split("/").slice(0, -1);
 	for (const part of target.split("/")) {
@@ -83,14 +76,14 @@ export function subworkflowTarget(
 		}
 		if (part === "..") {
 			if (parts.length === 0) {
-				throw new Error(
+				throw new WorkflowViewError(
 					"The sub-workflow path leaves workspace/workflows. Move the file inside it.",
 				);
 			}
 			parts.pop();
 		} else {
 			if (part.startsWith(".") || part === "node_modules") {
-				throw new Error(
+				throw new WorkflowViewError(
 					"Move the sub-workflow outside hidden folders and node_modules to inspect it.",
 				);
 			}
@@ -99,7 +92,7 @@ export function subworkflowTarget(
 	}
 	const filename = parts.join("/");
 	if (!workflowFilename(filename)) {
-		throw new Error(
+		throw new WorkflowViewError(
 			"Use a .lobster, .yaml, .yml, or .json workflow path within 8 directory levels and 2048 UTF-8 bytes.",
 		);
 	}

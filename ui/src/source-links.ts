@@ -1,6 +1,7 @@
 import { createContext, createElement as h, useContext, type ReactNode } from "react";
 import { parse as parseYaml } from "yaml";
 import type { LobsterSourceFile } from "../workflow-types.js";
+import { isDynamicWorkflowPath } from "./subworkflow-target.js";
 import { syntax } from "./syntax.js";
 
 type FileLinks = {
@@ -11,19 +12,20 @@ type FileLinks = {
 type Reference = { start: number; end: number; path: string };
 export const SourceLinksContext = createContext<FileLinks | null>(null);
 
-function isLiteralPath(value: string): boolean {
+function isLiteralPath(value: string, field?: string): boolean {
 	return (
 		Boolean(value) &&
 		!value.startsWith("/") &&
-		!/[$`*?:\\]/u.test(value) &&
+		!(field === "workflow" ? isDynamicWorkflowPath(value) : value.includes("$")) &&
+		!/[`*?:\\]/u.test(value) &&
 		!Array.from(value).some(
 			(character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
 		)
 	);
 }
 
-function normalize(path: string): string | undefined {
-	if (!isLiteralPath(path)) {
+function normalize(path: string, field?: string): string | undefined {
+	if (!isLiteralPath(path, field)) {
 		return undefined;
 	}
 	const parts: string[] = [];
@@ -47,10 +49,10 @@ function fileReferences(text: string, context: FileLinks, field?: string): Refer
 	const known = new Set(context.files.map((file) => file.path));
 	const directory = context.filename?.split("/").slice(0, -1).join("/");
 	const resolve = (value: string) => {
-		if (!isLiteralPath(value)) {
+		if (!isLiteralPath(value, field)) {
 			return undefined;
 		}
-		const relative = normalize(directory ? `${directory}/${value}` : value);
+		const relative = normalize(directory ? `${directory}/${value}` : value, field);
 		// Lobster resolves the workflow field relative to its declaring file.
 		if (field === "workflow") {
 			return relative && known.has(relative) ? relative : undefined;

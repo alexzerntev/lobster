@@ -164,7 +164,7 @@ export const mountWorkflows: LobsterView = (container, context) => {
 		status.textContent = "Loading workflows…";
 		panel.setAttribute("aria-busy", "true");
 		try {
-			const result = await host.request<LobsterWorkflowsResult>("lobster.workflows.list", {});
+			const result = await host.workflows.list();
 			if (disposed || signal.aborted || current !== generation) {
 				return;
 			}
@@ -175,7 +175,7 @@ export const mountWorkflows: LobsterView = (container, context) => {
 				return;
 			}
 			status.setAttribute("role", "alert");
-			status.textContent = `Could not load workflows. ${host.redact(error instanceof Error ? error.message : String(error))}`;
+			status.textContent = `Could not load workflows. ${host.errorMessage(error)}`;
 		} finally {
 			if (!disposed && !signal.aborted && current === generation) {
 				panel.setAttribute("aria-busy", "false");

@@ -2,7 +2,7 @@ import type { LobsterPageTarget } from "@lobster/ui/view-context";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { LobsterWorkflowFileResult } from "@lobster/ui/workflow-types";
-import { createDevelopmentHost } from "./preview-host.js";
+import { createDevelopmentHost, readPreview } from "./preview-host.js";
 
 function fixture() {
 	const requests: Array<{
@@ -42,27 +42,24 @@ function fixture() {
 	return { owner, lifetime, view, requests, navigations };
 }
 
-test("the mock starts disconnected and only forwards the four read-only workflow requests", async () => {
+test("the adapter starts disconnected and forwards typed workflow reads", async () => {
 	const { owner, view, requests } = fixture();
 	assert.equal(view.host.connection.connected, false);
-	await assert.rejects(view.host.request("lobster.workflows.list"), /disconnected/);
+	await assert.rejects(view.host.workflows.list(), /disconnected/);
 	assert.equal(requests.length, 0);
 	owner.setConnection(true);
-	assert.deepEqual(await view.host.request("lobster.workflows.list"), { workflows: [] });
-	assert.deepEqual(await view.host.request("lobster.workflows.get", { id: "file:abc" }), {
+	assert.deepEqual(await view.host.workflows.list(), { workflows: [] });
+	assert.deepEqual(await view.host.workflows.get("file:abc"), {
 		workflow: { id: "file:abc", name: "Example", source: "file" },
 	});
-	assert.deepEqual(await view.host.request("lobster.workflows.files", { id: "file:abc" }), {
+	assert.deepEqual(await view.host.workflows.files("file:abc"), {
 		files: [{ path: "sample.yaml", language: "yaml" }],
 		defaultPath: "sample.yaml",
 		truncated: false,
 	});
-	assert.deepEqual(
-		await view.host.request("lobster.workflows.file", { id: "file:abc", path: "scripts/hello.js" }),
-		{
-			file: { path: "scripts/hello.js", language: "javascript", text: "console.log('hello');" },
-		},
-	);
+	assert.deepEqual(await view.host.workflows.file("file:abc", "scripts/hello.js"), {
+		file: { path: "scripts/hello.js", language: "javascript", text: "console.log('hello');" },
+	});
 	assert.deepEqual(
 		requests.map(({ method, id }) => ({ method, id })),
 		[
@@ -83,27 +80,16 @@ test("the mock starts disconnected and only forwards the four read-only workflow
 	);
 });
 
-test("unsupported host calls and unexpected parameters cannot reach transport or navigation", async () => {
+test("invalid workflow ids, source paths and page targets never reach transport or navigation", async () => {
 	const { owner, view, requests, navigations } = fixture();
 	owner.setConnection(true);
-	for (const [method, params] of [
-		["sessions.create", {}],
-		["lobster.workflows.run", { id: "file:abc" }],
-		["lobster.workflows.list", { agentId: "main" }],
-		["lobster.workflows.get", {}],
-		["lobster.workflows.get", { id: "  " }],
-		["lobster.workflows.get", { id: 3 }],
-		["lobster.workflows.get", { id: "file:abc", run: true }],
-		["lobster.workflows.files", {}],
-		["lobster.workflows.files", { id: "file:abc", path: "other.js" }],
-		["lobster.workflows.file", { id: "file:abc" }],
-		["lobster.workflows.file", { id: "file:abc", path: "" }],
-		["lobster.workflows.file", { id: "file:abc", path: 3 }],
-		["lobster.workflows.file", { id: "file:abc", path: "sample.js", run: true }],
-	] as const) {
-		await assert.rejects(view.host.request(method, params), /development/);
+	for (const read of [
+		() => view.host.workflows.get("  "),
+		() => view.host.workflows.files(""),
+		() => view.host.workflows.file("file:abc", ""),
+	]) {
+		await assert.rejects(read(), /Select a workflow/);
 	}
-	assert.throws(() => view.host.onEvent("chat", () => {}), /not supported/);
 	const unsupportedPages: LobsterPageTarget[] = [
 		{ id: "automations" },
 		{ id: "workflow" },
@@ -134,9 +120,9 @@ test("navigation remains local and preserves the exact workflow id", () => {
 test("connection changes, reconnects, and file events reach live subscriptions only", () => {
 	const { owner, view, lifetime } = fixture();
 	const connections: boolean[] = [];
-	const changes: unknown[] = [];
+	let changes = 0;
 	const unsubscribe = view.host.subscribe(() => connections.push(view.host.connection.connected));
-	const stopEvents = view.host.onEvent("lobster.workflows-changed", (event) => changes.push(event));
+	const stopEvents = view.host.onWorkflowsChanged(() => changes++);
 	owner.setConnection(true);
 	owner.setConnection(true);
 	owner.emitWorkflowsChanged();
@@ -144,15 +130,15 @@ test("connection changes, reconnects, and file events reach live subscriptions o
 	owner.setConnection(true);
 	owner.emitWorkflowsChanged();
 	assert.deepEqual(connections, [true, false, true]);
-	assert.deepEqual(changes, [{}, {}]);
+	assert.equal(changes, 2);
 	stopEvents();
 	unsubscribe();
 	owner.notify();
 	owner.emitWorkflowsChanged();
 	assert.equal(connections.length, 3);
-	assert.equal(changes.length, 2);
+	assert.equal(changes, 2);
 	view.host.subscribe(() => assert.fail("Aborted subscription called"));
-	view.host.onEvent("lobster.workflows-changed", () => assert.fail("Aborted event called"));
+	view.host.onWorkflowsChanged(() => assert.fail("Aborted event called"));
 	lifetime.abort();
 	owner.setConnection(false);
 	owner.notify();
@@ -186,15 +172,15 @@ test("navigation aborts pending source reads and rejects late results, even if t
 	const lifetime = new AbortController();
 	const { host } = owner.createView(lifetime.signal);
 	owner.setConnection(true);
-	const pending = host.request("lobster.workflows.file", { id: "file:abc", path: "script.js" });
+	const pending = host.workflows.file("file:abc", "script.js");
 	lifetime.abort();
 	assert.equal(transportSignal?.aborted, true);
 	complete({ file: { path: "script.js", language: "javascript", text: "late result" } });
 	await assert.rejects(pending, { name: "AbortError" });
-	await assert.rejects(host.request("lobster.workflows.list"), { name: "AbortError" });
+	await assert.rejects(host.workflows.list(), { name: "AbortError" });
 	assert.throws(() => host.navigation.openPage({ id: "workflows" }), { name: "AbortError" });
 	assert.throws(() => host.subscribe(() => {}), { name: "AbortError" });
-	assert.throws(() => host.onEvent("lobster.workflows-changed", () => {}), {
+	assert.throws(() => host.onWorkflowsChanged(() => {}), {
 		name: "AbortError",
 	});
 	owner.dispose();
@@ -210,8 +196,8 @@ test("disposing a view revokes its host without disturbing another live view", a
 	view.dispose();
 	owner.setConnection(true);
 	assert.equal(notifications, 1);
-	await assert.rejects(view.host.request("lobster.workflows.list"), { name: "AbortError" });
-	assert.deepEqual(await second.host.request("lobster.workflows.list"), { workflows: [] });
+	await assert.rejects(view.host.workflows.list(), { name: "AbortError" });
+	assert.deepEqual(await second.host.workflows.list(), { workflows: [] });
 	owner.dispose();
 	owner.notify();
 	owner.emitWorkflowsChanged();
@@ -220,17 +206,41 @@ test("disposing a view revokes its host without disturbing another live view", a
 	assert.throws(() => owner.createView(new AbortController().signal), { name: "AbortError" });
 });
 
-test("the development redactor masks untrusted details and preserves actionable mock-owned errors", async () => {
+test("known workflow API errors stay actionable and unknown failures do not expose details", async (t) => {
 	const { owner, view } = fixture();
-	const source = "Authorization: Bearer synthetic-private-detail";
-	const redacted = view.host.redact(source);
-	assert.equal(redacted.includes(source), false);
-	assert.equal(redacted.includes("synthetic-private-detail"), false);
-	assert.match(redacted, /Details are hidden/);
-	await assert.rejects(view.host.request("lobster.workflows.list"), (error: unknown) => {
-		assert.ok(error instanceof Error);
-		assert.equal(view.host.redact(error.message), error.message);
-		assert.match(error.message, /Check that it is running/);
+	const safeMessage = "Workflow catalog exceeds 100 workflow files. Narrow the workspace.";
+	const privateMessage = "Authorization: Bearer synthetic-private-detail";
+	let body: unknown = { error: { type: "workflow", message: safeMessage } };
+	t.mock.method(
+		globalThis,
+		"fetch",
+		async () => new Response(JSON.stringify(body), { status: 400 }),
+	);
+	await assert.rejects(
+		readPreview("http://localhost/api/workflows", new AbortController().signal),
+		(error: unknown) => {
+			assert.equal(view.host.errorMessage(error), safeMessage);
+			return true;
+		},
+	);
+	for (const unknown of [
+		{ error: privateMessage },
+		{ error: { type: "internal", message: privateMessage } },
+		{ error: { type: "workflow", message: { secret: privateMessage } } },
+	]) {
+		body = unknown;
+		await assert.rejects(
+			readPreview("http://localhost/api/workflows", new AbortController().signal),
+			(error: unknown) => {
+				assert.equal(view.host.errorMessage(error).includes(privateMessage), false);
+				assert.match(view.host.errorMessage(error), /Check the development server/);
+				return true;
+			},
+		);
+	}
+	assert.equal(view.host.errorMessage(new Error(privateMessage)).includes(privateMessage), false);
+	await assert.rejects(view.host.workflows.list(), (error: unknown) => {
+		assert.match(view.host.errorMessage(error), /Check that it is running/);
 		return true;
 	});
 	owner.dispose();

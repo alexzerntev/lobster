@@ -1,35 +1,29 @@
-import { Ajv, type AnySchema, type ValidateFunction } from "ajv";
+import { Ajv, type AnySchema, type Options, type ValidateFunction } from "ajv";
 
 import { stableStringify } from "./state/store.js";
 
-export const sharedAjv = new Ajv({
-	allErrors: false,
-	strict: false,
-	// User-provided schemas may repeat `$id` across runs/resumes.
-	addUsedSchema: false,
-});
+const maxCompilationAttempts = 128;
 
 /**
- * Build a memoized `compile()` for a given Ajv instance.
- *
- * Calling `ajv.compile(schema)` per request leaks SchemaEnv / closure graphs
- * that Ajv retains indefinitely (issue #96). Memoization
- * eliminates the leak for the common case where the same schema is recompiled
- * across calls.
- *
- * Cache key is the stable JSON serialization of the schema, which catches
- * structurally-identical schemas across reloads even when keys are inserted
- * in different orders.
- *
- * Each Ajv instance gets its own cache because compiled validators are not
- * interchangeable across different Ajv configurations.
+ * Reuse equivalent schemas within a bounded compiler generation. Ajv retains
+ * generated-code references even after removeSchema(), so rotating the compiler
+ * also releases those references when callers no longer hold its validators.
+ * Failed compilations count toward the limit because they can retain state too.
  */
-export function createCompileCached(ajv: Ajv): (schema: AnySchema) => ValidateFunction {
+export function createCompileCached(options: Options): (schema: AnySchema) => ValidateFunction {
 	const cache = new Map<string, ValidateFunction>();
+	let ajv = new Ajv(options);
+	let attempts = 0;
 	return function compileCached(schema: AnySchema): ValidateFunction {
 		const key = stableStringify(schema);
 		let validator = cache.get(key);
 		if (!validator) {
+			if (attempts === maxCompilationAttempts) {
+				ajv = new Ajv(options);
+				cache.clear();
+				attempts = 0;
+			}
+			attempts += 1;
 			validator = ajv.compile(schema);
 			cache.set(key, validator);
 		}
@@ -37,5 +31,9 @@ export function createCompileCached(ajv: Ajv): (schema: AnySchema) => ValidateFu
 	};
 }
 
-/** Memoized compile bound to the module-level `sharedAjv` instance. */
-export const compileCached = createCompileCached(sharedAjv);
+export const compileCached = createCompileCached({
+	allErrors: false,
+	strict: false,
+	// User-provided schemas may repeat `$id` across runs/resumes.
+	addUsedSchema: false,
+});

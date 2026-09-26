@@ -1,7 +1,14 @@
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { LobsterWorkflowsResult, LobsterWorkflowFileResult } from "../workflow-types.js";
+import type {
+	LobsterWorkflowsResult,
+	LobsterWorkflowFileResult,
+	LobsterWorkflowResult,
+	LobsterSourceLanguage,
+	LobsterSourceFile,
+} from "../workflow-types.js";
 import { createViewFixture, mockSource } from "./index.test-support.js";
+import { WorkflowViewError } from "./workflow-errors.js";
 
 describe("Lobster workflow page", () => {
 	it("loads more matching workflows and preserves the visible limit across file changes", async () => {
@@ -12,7 +19,7 @@ describe("Lobster workflow page", () => {
 			description: i >= 20 ? "Matches search" : "Other",
 			source: "file",
 		}));
-		fixture.request.mockResolvedValueOnce({ workflows });
+		fixture.list.mockResolvedValueOnce({ workflows });
 		fixture.mount();
 		await Promise.resolve();
 		const more = () => fixture.container.querySelector<HTMLButtonElement>("button");
@@ -29,14 +36,14 @@ describe("Lobster workflow page", () => {
 		expect(count()).toBe("40 of 41");
 		expect(names().slice(0, 20)).toEqual(firstBatch);
 		expect(names()).toHaveLength(40);
-		fixture.request.mockResolvedValueOnce({ workflows });
+		fixture.list.mockResolvedValueOnce({ workflows });
 		await act(async () => fixture.changed());
 		expect(count()).toBe("40 of 41");
 		more()!.click();
 		expect(count()).toBe("41 of 41");
 		expect(names()).toHaveLength(41);
 		expect(more()).toBeNull();
-		fixture.request.mockResolvedValueOnce({ workflows: workflows.slice(0, 40) });
+		fixture.list.mockResolvedValueOnce({ workflows: workflows.slice(0, 40) });
 		await act(async () => fixture.changed());
 		expect(count()).toBe("40 of 40");
 		expect(more()).toBeNull();
@@ -56,62 +63,62 @@ describe("Lobster workflow page", () => {
 		search.dispatchEvent(new Event("input"));
 		expect(count()).toBe("20 of 40");
 		expect(more()?.textContent).toBe("Load more");
-		expect(fixture.request).toHaveBeenCalledTimes(3);
+		expect(fixture.list).toHaveBeenCalledTimes(3);
 	});
 
 	it("coalesces filesystem events, catches edits during refresh, and releases its subscription", async () => {
 		const fixture = await createViewFixture();
-		fixture.request.mockResolvedValueOnce({ workflows: [] });
+		fixture.list.mockResolvedValueOnce({ workflows: [] });
 		fixture.mount();
 		await Promise.resolve();
 		const search = fixture.container.querySelector<HTMLInputElement>('input[type="search"]')!;
 		search.value = "Latest";
 		search.dispatchEvent(new Event("input"));
 		const pending = Promise.withResolvers<LobsterWorkflowsResult>();
-		fixture.request.mockReturnValueOnce(pending.promise).mockResolvedValueOnce({
+		fixture.list.mockReturnValueOnce(pending.promise).mockResolvedValueOnce({
 			workflows: [{ id: "file:latest", name: "Latest version", source: "file" }],
 		});
 		fixture.changed();
 		fixture.changed();
 		await Promise.resolve();
-		expect(fixture.request).toHaveBeenCalledTimes(2);
+		expect(fixture.list).toHaveBeenCalledTimes(2);
 		fixture.changed();
 		fixture.changed();
-		expect(fixture.request).toHaveBeenCalledTimes(2);
+		expect(fixture.list).toHaveBeenCalledTimes(2);
 		pending.resolve({ workflows: [] });
 		// Drain the request and the single queued refresh; no elapsed-time dependency.
 		await pending.promise;
 		await Promise.resolve();
 		await Promise.resolve();
 		await Promise.resolve();
-		expect(fixture.request).toHaveBeenCalledTimes(3);
+		expect(fixture.list).toHaveBeenCalledTimes(3);
 		expect(fixture.container.querySelector("li")?.textContent).toContain("Latest version");
 		expect(search.value).toBe("Latest");
 		fixture.changed();
 		fixture.abort.abort();
 		await Promise.resolve();
-		expect(fixture.events.get("lobster.workflows-changed")?.size).toBe(0);
-		expect(fixture.request).toHaveBeenCalledTimes(3);
+		expect(fixture.events.size).toBe(0);
+		expect(fixture.list).toHaveBeenCalledTimes(3);
 		expect(fixture.container.childElementCount).toBe(0);
 	});
 
 	it("defers hidden-view updates and catches up when the view is presented again", async () => {
 		const fixture = await createViewFixture();
-		fixture.request.mockResolvedValueOnce({ workflows: [] });
+		fixture.list.mockResolvedValueOnce({ workflows: [] });
 		fixture.mount();
 		await Promise.resolve();
 		fixture.present(false);
 		fixture.changed();
 		fixture.changed();
 		await Promise.resolve();
-		expect(fixture.request).toHaveBeenCalledTimes(1);
-		fixture.request.mockResolvedValueOnce({
+		expect(fixture.list).toHaveBeenCalledTimes(1);
+		fixture.list.mockResolvedValueOnce({
 			workflows: [{ id: "file:new", name: "Created while hidden", source: "file" }],
 		});
 		fixture.present(true);
 		await Promise.resolve();
 		await Promise.resolve();
-		expect(fixture.request).toHaveBeenCalledTimes(2);
+		expect(fixture.list).toHaveBeenCalledTimes(2);
 		expect(fixture.container.querySelector("li")?.textContent).toContain("Created while hidden");
 	});
 
@@ -126,7 +133,7 @@ describe("Lobster workflow page", () => {
 			},
 		);
 		const fixture = await createViewFixture("workflow", "file:live");
-		const detail = (text: string) => ({
+		const detail = (text: string): LobsterWorkflowResult => ({
 			workflow: {
 				id: "file:live",
 				name: "Live",
@@ -135,14 +142,14 @@ describe("Lobster workflow page", () => {
 				definition: { filename: "live.lobster", language: "yaml", text },
 			},
 		});
-		fixture.request.mockResolvedValueOnce(detail("name: before"));
+		fixture.get.mockResolvedValueOnce(detail("name: before"));
 		await act(async () => fixture.mount());
 		const codeButton = Array.from(fixture.container.querySelectorAll("button")).find(
 			(button) => button.textContent === "Code",
 		)!;
 		mockSource(fixture, "live.lobster", "name: before");
 		await act(async () => codeButton.click());
-		fixture.request.mockResolvedValueOnce(detail("name: after"));
+		fixture.get.mockResolvedValueOnce(detail("name: after"));
 		mockSource(fixture, "live.lobster", "name: after");
 		await act(async () => fixture.changed());
 		expect(codeButton.getAttribute("aria-pressed")).toBe("true");
@@ -151,16 +158,16 @@ describe("Lobster workflow page", () => {
 			false,
 		);
 		await act(async () => fixture.abort.abort());
-		expect(fixture.events.get("lobster.workflows-changed")?.size).toBe(0);
+		expect(fixture.events.size).toBe(0);
 	});
 
 	it("mounts the workflow list and keeps filtering across filesystem updates", async () => {
 		const fixture = await createViewFixture();
 		const pending = Promise.withResolvers<LobsterWorkflowsResult>();
-		fixture.request.mockReturnValueOnce(pending.promise);
+		fixture.list.mockReturnValueOnce(pending.promise);
 		fixture.mount();
 		expect(fixture.container.textContent).toContain("Loading workflows");
-		expect(fixture.request).toHaveBeenCalledWith("lobster.workflows.list", {});
+		expect(fixture.list).toHaveBeenCalledWith();
 		pending.resolve({
 			workflows: [
 				{
@@ -202,16 +209,16 @@ describe("Lobster workflow page", () => {
 		expect(fixture.container.textContent).toContain("No matching workflows.");
 		filter("");
 		expect(fixture.container.querySelectorAll("li")).toHaveLength(2);
-		expect(fixture.request).toHaveBeenCalledTimes(1);
+		expect(fixture.list).toHaveBeenCalledTimes(1);
 
 		filter("new result");
-		const updated = Promise.resolve({
+		const updated = Promise.resolve<LobsterWorkflowsResult>({
 			workflows: [
 				{ id: "file:new", name: "New result", source: "file" },
 				{ id: "file:other", name: "Other", source: "file" },
 			],
 		});
-		fixture.request.mockReturnValueOnce(updated);
+		fixture.list.mockReturnValueOnce(updated);
 		await act(async () => fixture.changed());
 		await updated;
 		expect(search.value).toBe("new result");
@@ -219,7 +226,7 @@ describe("Lobster workflow page", () => {
 		expect(fixture.container.querySelector("li")?.textContent).toContain("New result");
 
 		const empty = Promise.resolve({ workflows: [] });
-		fixture.request.mockReturnValueOnce(empty);
+		fixture.list.mockReturnValueOnce(empty);
 		await act(async () => fixture.changed());
 		await empty;
 		expect(fixture.container.querySelector("li")).toBeNull();
@@ -237,37 +244,27 @@ describe("Lobster workflow page", () => {
 		);
 		const fixture = await createViewFixture("workflow", "file:source");
 		const slow = Promise.withResolvers<LobsterWorkflowFileResult>();
-		const sources = new Map([
+		const sources = new Map<string, { language: LobsterSourceLanguage; text: string }>([
 			["main.lobster", { language: "yaml", text: "steps: []" }],
 			["scripts/slow.js", { language: "javascript", text: "// slow" }],
 			["scripts/run.js", { language: "javascript", text: 'export const value = "<img src=x>";' }],
 		]);
-		fixture.request.mockImplementation(async (method, params) => {
-			if (method === "lobster.workflows.get") {
-				return {
-					workflow: {
-						id: "file:source",
-						name: "Source",
-						source: "file",
-						graph: { nodes: [], edges: [] },
-					},
-				};
-			}
-			if (method === "lobster.workflows.files") {
-				return {
-					files: [...sources].map(([path, file]) => ({ path, language: file.language })),
-					defaultPath: "main.lobster",
-					truncated: false,
-				};
-			}
-			if (method === "lobster.workflows.file") {
-				const path = params?.path as string;
-				if (path === "scripts/slow.js") {
-					return slow.promise;
-				}
-				return { file: { path, ...sources.get(path) } };
-			}
-			throw new Error(`Unexpected method ${method}`);
+		fixture.get.mockResolvedValue({
+			workflow: {
+				id: "file:source",
+				name: "Source",
+				source: "file",
+				graph: { nodes: [], edges: [] },
+			},
+		});
+		fixture.files.mockImplementation(async () => ({
+			files: [...sources].map(([path, file]) => ({ path, language: file.language })),
+			defaultPath: "main.lobster",
+			truncated: false,
+		}));
+		fixture.file.mockImplementation(async (_id, path) => {
+			if (path === "scripts/slow.js") return slow.promise;
+			return { file: { path, ...sources.get(path)! } };
 		});
 		await act(async () => fixture.mount());
 		const select = (path: string) =>
@@ -314,17 +311,17 @@ describe("Lobster workflow page", () => {
 		const fixture = await createViewFixture("workflow", "file:first");
 		const stale = Promise.withResolvers<LobsterWorkflowFileResult>();
 		const retired = Promise.withResolvers<LobsterWorkflowFileResult>();
-		fixture.request.mockResolvedValueOnce({
+		fixture.get.mockResolvedValueOnce({
 			workflow: { id: "file:first", source: "file", name: "First" },
 		});
-		fixture.request.mockResolvedValueOnce({
+		fixture.files.mockResolvedValueOnce({
 			files: [{ path: "first.yaml", language: "yaml" }],
 			defaultPath: "first.yaml",
 			truncated: false,
 		});
-		fixture.request.mockReturnValueOnce(stale.promise);
+		fixture.file.mockReturnValueOnce(stale.promise);
 		await act(async () => fixture.mount());
-		fixture.request.mockResolvedValueOnce({
+		fixture.get.mockResolvedValueOnce({
 			workflow: { id: "file:second", source: "file", name: "Second" },
 		});
 		mockSource(fixture, "second.yaml", "name: second");
@@ -334,7 +331,7 @@ describe("Lobster workflow page", () => {
 			await stale.promise;
 		});
 		expect(fixture.container.querySelector("pre")?.textContent).toBe("name: second");
-		fixture.request.mockReturnValueOnce(retired.promise);
+		fixture.file.mockReturnValueOnce(retired.promise);
 		await act(async () =>
 			fixture.container
 				.querySelector<HTMLButtonElement>('button[data-path="second.yaml"]')!
@@ -346,7 +343,7 @@ describe("Lobster workflow page", () => {
 			await retired.promise;
 		});
 		expect(fixture.container.childElementCount).toBe(0);
-		expect(fixture.events.get("lobster.workflows-changed")?.size).toBe(0);
+		expect(fixture.events.size).toBe(0);
 	});
 
 	it("opens command, input and relative subworkflow references in Code without opening a child dialog", async () => {
@@ -361,56 +358,47 @@ describe("Lobster workflow page", () => {
 		);
 		const fixture = await createViewFixture("workflow", "file:links");
 		const command = 'node "scripts/task one.js" --config=workflows/scripts/options.json';
-		const files = [
+		const files: LobsterSourceFile[] = [
 			{ path: "nested/main.lobster", language: "yaml" },
 			{ path: "nested/child.lobster", language: "yaml" },
 			{ path: "scripts/task one.js", language: "javascript" },
 			{ path: "scripts/options.json", language: "json" },
 		];
-		fixture.request.mockImplementation(async (method, params) => {
-			if (method === "lobster.workflows.get") {
-				return {
-					workflow: {
-						id: "file:links",
-						name: "Links",
-						source: "file",
-						definition: { filename: "nested/main.lobster", language: "yaml", text: "steps: []" },
-						graph: {
-							nodes: [
-								{ id: "command", type: "run", label: "Command", shape: "box" },
-								{ id: "child", type: "workflow", label: "Child", shape: "box" },
-								{ id: "input", type: "input", label: "Input", shape: "box" },
-							],
-							edges: [],
+		fixture.get.mockResolvedValue({
+			workflow: {
+				id: "file:links",
+				name: "Links",
+				source: "file",
+				definition: { filename: "nested/main.lobster", language: "yaml", text: "steps: []" },
+				graph: {
+					nodes: [
+						{ id: "command", type: "run", label: "Command", shape: "box" },
+						{ id: "child", type: "workflow", label: "Child", shape: "box" },
+						{ id: "input", type: "input", label: "Input", shape: "box" },
+					],
+					edges: [],
+				},
+				steps: [
+					{ id: "command", command },
+					{ id: "child", workflow: "./child.lobster" },
+					{
+						id: "input",
+						input: {
+							prompt: "Select file",
+							responseSchema: { type: "string", enum: ["scripts/options.json"] },
 						},
-						steps: [
-							{ id: "command", fields: [{ name: "command", value: command, language: "bash" }] },
-							{ id: "child", fields: [{ name: "workflow", value: "./child.lobster" }] },
-							{
-								id: "input",
-								fields: [
-									{
-										name: "input",
-										value: JSON.stringify({
-											responseSchema: { type: "string", enum: ["scripts/options.json"] },
-										}),
-									},
-								],
-							},
-						],
 					},
-				};
-			}
-			if (method === "lobster.workflows.files") {
-				return { files, defaultPath: "nested/main.lobster", truncated: false };
-			}
-			if (method === "lobster.workflows.file") {
-				return {
-					file: { path: params?.path, language: "plaintext", text: `Contents of ${params?.path}` },
-				};
-			}
-			throw new Error(`Unexpected method ${method}`);
+				],
+			},
 		});
+		fixture.files.mockImplementation(async () => ({
+			files,
+			defaultPath: "nested/main.lobster",
+			truncated: false,
+		}));
+		fixture.file.mockImplementation(async (_id, path) => ({
+			file: { path, language: "plaintext", text: `Contents of ${path}` },
+		}));
 		await act(async () => fixture.mount());
 		const flow = Array.from(fixture.container.querySelectorAll("button")).find(
 			(button) => button.textContent === "Flow",
@@ -459,17 +447,19 @@ describe("Lobster workflow page", () => {
 
 	it("recovers from a failed catalog read after a filesystem change", async () => {
 		const fixture = await createViewFixture();
-		const failed = Promise.reject(new Error("Discovery unavailable"));
-		fixture.request.mockReturnValueOnce(failed);
+		const failed = Promise.reject(
+			new WorkflowViewError("Workflow catalog exceeds 100 workflow files. Narrow the workspace."),
+		);
+		fixture.list.mockReturnValueOnce(failed);
 		fixture.mount();
 		await failed.catch(() => {});
 		expect(fixture.container.querySelector('[role="alert"]')?.textContent).toContain(
-			"Discovery unavailable",
+			"100 workflow files",
 		);
-		const recovered = Promise.resolve({
+		const recovered = Promise.resolve<LobsterWorkflowsResult>({
 			workflows: [{ id: "file:recovered", name: "recovered", source: "file" }],
 		});
-		fixture.request.mockReturnValueOnce(recovered);
+		fixture.list.mockReturnValueOnce(recovered);
 		await act(async () => fixture.changed());
 		await recovered;
 		expect(fixture.container.querySelector('[role="alert"]')).toBeNull();
@@ -479,14 +469,14 @@ describe("Lobster workflow page", () => {
 	it("rejects stale results across reconnect and disposal", async () => {
 		const fixture = await createViewFixture();
 		const stale = Promise.withResolvers<LobsterWorkflowsResult>();
-		fixture.request.mockReturnValueOnce(stale.promise);
+		fixture.list.mockReturnValueOnce(stale.promise);
 		fixture.mount();
 		fixture.connect(false);
 		expect(fixture.container.textContent).toContain("Connect to the workflow server");
-		const current = Promise.resolve({
+		const current = Promise.resolve<LobsterWorkflowsResult>({
 			workflows: [{ id: "file:current", name: "current", source: "file" }],
 		});
-		fixture.request.mockReturnValueOnce(current);
+		fixture.list.mockReturnValueOnce(current);
 		fixture.connect(true);
 		await current;
 		stale.resolve({ workflows: [{ id: "file:stale", name: "stale", source: "file" }] });
@@ -494,7 +484,7 @@ describe("Lobster workflow page", () => {
 		expect(fixture.container.querySelector("li")?.textContent).toContain("current");
 
 		const retired = Promise.withResolvers<LobsterWorkflowsResult>();
-		fixture.request.mockReturnValueOnce(retired.promise);
+		fixture.list.mockReturnValueOnce(retired.promise);
 		fixture.changed();
 		await Promise.resolve();
 		fixture.abort.abort();
@@ -515,79 +505,48 @@ describe("Lobster workflow page", () => {
 			},
 		);
 		const fixture = await createViewFixture("workflow", "file:fields");
-		fixture.request.mockResolvedValue({
+		const reviewStep = {
+			id: "review",
+			input: {
+				prompt: "<em>Choose a value</em>",
+				responseSchema: {
+					type: "object",
+					properties: {
+						choice: { type: "string", enum: ["one", "<img src=x onerror=alert(1)>"] },
+						count: { type: "integer" },
+					},
+					required: ["choice"],
+				},
+			},
+			when: false,
+			limit: 0,
+			empty: "",
+			unset: null,
+		};
+		fixture.get.mockResolvedValue({
 			workflow: {
 				id: "file:fields",
 				name: "Fields",
 				source: "file",
 				steps: [
-					{
-						id: "review",
-						fields: [
-							{
-								name: "input",
-								value: JSON.stringify({
-									prompt: "<em>Choose a value</em>",
-									responseSchema: {
-										type: "object",
-										properties: {
-											choice: { type: "string", enum: ["one", "<img src=x onerror=alert(1)>"] },
-											count: { type: "integer" },
-										},
-										required: ["choice"],
-									},
-								}),
-							},
-							{ name: "when", value: "false" },
-							{ name: "limit", value: "0" },
-							{ name: "empty", value: '""' },
-							{ name: "unset", value: "null" },
-						],
-					},
+					reviewStep,
 					{
 						id: "group",
-						fields: [
-							{
-								name: "parallel",
-								value:
-									"wait: all\nbranches:\n  - id: branch-command\n    command: printf 'branch'\n  - id: branch-pipeline\n    pipeline: json",
-							},
-							{ name: "approval", value: "true" },
-						],
+						parallel: {
+							wait: "all",
+							branches: [
+								{ id: "branch-command", command: "printf 'branch'" },
+								{ id: "branch-pipeline", pipeline: "json" },
+							],
+						},
+						approval: true,
 					},
-					{
-						id: "execute",
-						fields: [
-							{
-								name: "run",
-								value: "printf '<img src=x onerror=alert(1)>'\necho \"$VALUE\"",
-								language: "bash",
-							},
-						],
-					},
-					{
-						id: "process",
-						fields: [
-							{ name: "pipeline", value: "head --n 1 | json" },
-							{ name: "stdin", value: "$execute.json" },
-						],
-					},
-					{
-						id: "child",
-						fields: [
-							{ name: "workflow", value: "child.lobster" },
-							{ name: "approval", value: "true" },
-						],
-					},
-					{
-						id: "each",
-						fields: [
-							{ name: "for_each", value: "$execute.json" },
-							{ name: "steps", value: "- id: nested\n  run: echo item" },
-						],
-					},
-					{ id: "approve", fields: [{ name: "approval", value: "Continue?" }] },
-					// A graph node can still render when field metadata is absent.
+					{ id: "execute", run: "printf '<img src=x onerror=alert(1)>'\necho \"$VALUE\"" },
+					{ id: "process", pipeline: "head --n 1 | json", stdin: "$execute.json" },
+					{ id: "child", workflow: "child.lobster", approval: true },
+					{ id: "each", for_each: "$execute.json", steps: [{ id: "nested", run: "echo item" }] },
+					{ id: "approve", approval: "Continue?" },
+					// A graph node can still render when step metadata is absent.
 				],
 				graph: {
 					nodes: [
@@ -698,12 +657,12 @@ describe("Lobster workflow page", () => {
 			},
 		);
 		const fixture = await createViewFixture("workflow", "file:invalid-parallel");
-		fixture.request.mockResolvedValueOnce({
+		fixture.get.mockResolvedValueOnce({
 			workflow: {
 				id: "file:invalid-parallel",
 				name: "Invalid parallel",
 				source: "file",
-				steps: [{ id: "group", fields: [{ name: "parallel", value: "branches: [" }] }],
+				steps: [{ id: "group", parallel: { branches: [] } }],
 				graph: {
 					nodes: [{ id: "group", type: "parallel", label: "group", shape: "box" }],
 					edges: [],
@@ -737,15 +696,15 @@ describe("Lobster workflow page", () => {
 			},
 		);
 		const fixture = await createViewFixture("workflow", "file:first");
-		const first = Promise.withResolvers<unknown>();
-		fixture.request.mockReturnValueOnce(first.promise);
+		const first = Promise.withResolvers<LobsterWorkflowResult>();
+		fixture.get.mockReturnValueOnce(first.promise);
 		await act(async () => fixture.mount());
-		const second = Promise.resolve({
+		const second = Promise.resolve<LobsterWorkflowResult>({
 			workflow: {
 				id: "file:second",
 				name: "Second",
 				source: "file",
-				steps: [{ id: "second", fields: [{ name: "command", value: "echo second" }] }],
+				steps: [{ id: "second", command: "echo second" }],
 				graph: {
 					nodes: [{ id: "second", type: "run", label: "second", shape: "box" }],
 					edges: [],
@@ -757,7 +716,7 @@ describe("Lobster workflow page", () => {
 				},
 			},
 		});
-		fixture.request.mockReturnValueOnce(second);
+		fixture.get.mockReturnValueOnce(second);
 		mockSource(
 			fixture,
 			"second.yaml",
@@ -787,8 +746,10 @@ describe("Lobster workflow page", () => {
 		expect(fixture.container.querySelector<HTMLElement>(".lobster-graph__code-view")?.hidden).toBe(
 			true,
 		);
-		expect(fixture.request).toHaveBeenCalledTimes(4);
-		const json = Promise.resolve({
+		expect(fixture.get).toHaveBeenCalledTimes(2);
+		expect(fixture.files).toHaveBeenCalledTimes(1);
+		expect(fixture.file).toHaveBeenCalledTimes(1);
+		const json = Promise.resolve<LobsterWorkflowResult>({
 			workflow: {
 				id: "file:json",
 				name: "JSON",
@@ -801,7 +762,7 @@ describe("Lobster workflow page", () => {
 				},
 			},
 		});
-		fixture.request.mockReturnValueOnce(json);
+		fixture.get.mockReturnValueOnce(json);
 		mockSource(fixture, "example.json", '{"name":"<em>JSON</em>"}', "json");
 		await act(async () => fixture.navigate("file:json"));
 		await json;
@@ -829,28 +790,24 @@ describe("Lobster workflow page", () => {
 			);
 			const fixture = await createViewFixture("workflow", "builtin:example");
 			const text = 'export function example() { return "done"; }';
-			fixture.request.mockImplementation(async (method) => {
-				if (method === "lobster.workflows.files") {
-					return {
-						files: [{ path: "example.js", language: "javascript" }],
-						defaultPath: "example.js",
-						truncated: false,
-					};
-				}
-				if (method === "lobster.workflows.file") {
-					return { file: { path: "example.js", language: "javascript", text } };
-				}
-				return {
-					workflow: {
-						id: "builtin:example",
-						name: "example",
-						description: "A built-in with <em>details</em>.",
-						source: "builtin",
-						...(hasSource
-							? { definition: { filename: "example.js", language: "javascript", text } }
-							: {}),
-					},
-				};
+			fixture.files.mockResolvedValue({
+				files: [{ path: "example.js", language: "javascript" }],
+				defaultPath: "example.js",
+				truncated: false,
+			});
+			fixture.file.mockResolvedValue({
+				file: { path: "example.js", language: "javascript", text },
+			});
+			fixture.get.mockResolvedValue({
+				workflow: {
+					id: "builtin:example",
+					name: "example",
+					source: "builtin",
+					description: "A built-in with <em>details</em>.",
+					...(hasSource
+						? { definition: { filename: "example.js", language: "javascript", text } }
+						: {}),
+				},
 			});
 			await act(async () => fixture.mount());
 			const nodes = fixture.container.querySelectorAll(".react-flow__node");
@@ -869,9 +826,7 @@ describe("Lobster workflow page", () => {
 			expect(codeView.hidden).toBe(true);
 			if (hasSource) {
 				expect(nodes[0]?.textContent).toContain("fileexample.js");
-				expect(
-					fixture.request.mock.calls.filter(([method]) => method === "lobster.workflows.file"),
-				).toHaveLength(0);
+				expect(fixture.file).not.toHaveBeenCalled();
 				await act(async () =>
 					nodes[0]!.querySelector<HTMLButtonElement>("[data-source-path]")!.click(),
 				);
@@ -899,7 +854,7 @@ describe("Lobster workflow page", () => {
 		);
 		const fixture = await createViewFixture("workflow", "file:example");
 		const text = 'export async function example() { return "<em>source</em>"; }';
-		const loaded = Promise.resolve({
+		const loaded = Promise.resolve<LobsterWorkflowResult>({
 			workflow: {
 				id: "file:example",
 				name: "Example",
@@ -908,7 +863,7 @@ describe("Lobster workflow page", () => {
 				unavailableReason: "No step definition. Select Code to view its implementation.",
 			},
 		});
-		fixture.request.mockReturnValueOnce(loaded);
+		fixture.get.mockReturnValueOnce(loaded);
 		mockSource(fixture, "example.js", text, "javascript");
 		await act(async () => fixture.mount());
 		await loaded;
@@ -925,7 +880,7 @@ describe("Lobster workflow page", () => {
 		flowButton?.click();
 		expect(codeView?.hidden).toBe(false);
 
-		const rejected = Promise.resolve({
+		const rejected = Promise.resolve<LobsterWorkflowResult>({
 			workflow: {
 				id: "file:unsupported",
 				name: "Unsupported graph",
@@ -933,7 +888,7 @@ describe("Lobster workflow page", () => {
 				unavailableReason: "Lobster returned an invalid workflow graph node",
 			},
 		});
-		fixture.request.mockReturnValueOnce(rejected);
+		fixture.get.mockReturnValueOnce(rejected);
 		mockSource(fixture, "unsupported.yaml", "steps: [broken", "yaml");
 		await act(async () => fixture.navigate("file:unsupported"));
 		await rejected;
@@ -942,19 +897,19 @@ describe("Lobster workflow page", () => {
 		expect(fixture.container.querySelector(".react-flow__node")).toBeNull();
 		expect(fixture.container.querySelector("pre")?.textContent).toBe("steps: [broken");
 
-		const file = Promise.resolve({
+		const file = Promise.resolve<LobsterWorkflowResult>({
 			workflow: {
 				id: "file:example",
 				name: "File",
 				source: "file",
-				steps: [{ id: "hello", fields: [{ name: "command", value: "echo hello" }] }],
+				steps: [{ id: "hello", command: "echo hello" }],
 				graph: {
 					nodes: [{ id: "hello", type: "run", label: "hello", shape: "box" }],
 					edges: [],
 				},
 			},
 		});
-		fixture.request.mockReturnValueOnce(file);
+		fixture.get.mockReturnValueOnce(file);
 		await act(async () => fixture.navigate("file:example"));
 		await file;
 		expect(flowButton?.getAttribute("aria-pressed")).toBe("true");

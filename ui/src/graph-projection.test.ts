@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { stringify } from "yaml";
+import type { WorkflowStep } from "../../src/workflows/types.js";
 import type { LobsterWorkflowDetail } from "../workflow-types.js";
 import { graphFor } from "./graph-layout.js";
 import { projectWorkflowGraph } from "./graph-projection.js";
 
 describe("parallel view projection", () => {
-	it.each(["all", "any"])(
-		"projects %s branches without mutating native graph or source fields",
+	it.each(["all", "any"] as const)(
+		"projects %s branches without mutating native graph or raw steps",
 		(wait) => {
 			const workflow: LobsterWorkflowDetail = {
 				id: "file:branches",
@@ -15,46 +15,35 @@ describe("parallel view projection", () => {
 				steps: [
 					{
 						id: "fan",
-						fields: [
-							{
-								name: "parallel",
-								value: stringify({
-									wait,
-									timeout_ms: 1000,
-									branches: [
-										{
-											id: "left",
-											run: "echo left",
-											stdin: { value: "$start.json" },
-											env: { MODE: "fixture" },
-										},
-										{ id: "right", pipeline: "json", stdin: "$start.stdout" },
-									],
-								}),
-							},
-							{ name: "approval", value: "Approve results?" },
-						],
+						parallel: {
+							wait,
+							timeout_ms: 1000,
+							branches: [
+								{
+									id: "left",
+									run: "echo left\\n",
+									stdin: { value: "$start.json" },
+									env: { MODE: "fixture" },
+								},
+								{ id: "right", pipeline: "json", stdin: "$start.stdout" },
+							],
+						},
+						approval: "Approve results?",
 					},
 					{
 						id: "consumer",
-						fields: [
-							{ name: "stdin", value: "$left.stdout" },
-							{ name: "when", value: "null" },
-							{ name: "condition", value: "$left.json" },
-						],
+						run: "cat",
+						stdin: "$left.stdout",
+						when: null,
+						condition: "$left.json",
 					},
 					{
 						id: "second",
-						fields: [
-							{ name: "when", value: '""' },
-							{ name: "condition", value: "$right.json.ready" },
-							{
-								name: "parallel",
-								value: stringify({
-									branches: [{ id: "fan::join", command: "echo second", stdin: "$left.json" }],
-								}),
-							},
-						],
+						when: "",
+						condition: "$right.json.ready",
+						parallel: {
+							branches: [{ id: "fan::join", command: "echo second", stdin: "$left.json" }],
+						},
 					},
 				],
 				graph: {
@@ -120,28 +109,42 @@ describe("parallel view projection", () => {
 		},
 	);
 
-	it("matches the native loader's run alias precedence and whitespace validation", () => {
+	it("retains native parallel nodes when expansion metadata is absent", () => {
+		const graph = {
+			nodes: [
+				{ id: "group", type: "parallel", label: "group", shape: "diamond" },
+				{ id: "after", type: "run", label: "after", shape: "box" },
+			],
+			edges: [{ from: "group", to: "after", label: "next" }],
+		} satisfies NonNullable<LobsterWorkflowDetail["graph"]>;
+		const visual = graphFor({ id: "file:native", name: "Native", source: "file", graph });
+		expect(visual.nodes.map((node) => [node.id, node.data.type, node.data.shape])).toEqual([
+			["group", "parallel", "diamond"],
+			["after", "run", "box"],
+		]);
+		expect(visual.edges.map(({ source, target, label }) => [source, target, label])).toEqual([
+			["group", "after", "next"],
+		]);
+	});
+
+	it("keeps loader-admitted branch aliases and whitespace source kinds", () => {
+		const steps: WorkflowStep[] = [
+			{
+				id: "group",
+				parallel: {
+					branches: [
+						{ id: "alias", run: "echo selected", command: "echo ignored" },
+						{ id: " ", command: " " },
+						{ id: "pipe-space", pipeline: " " },
+					],
+				},
+			},
+		];
 		const visual = graphFor({
 			id: "file:aliases",
 			name: "Aliases",
 			source: "file",
-			steps: [
-				{
-					id: "group",
-					fields: [
-						{
-							name: "parallel",
-							value: stringify({
-								branches: [
-									{ id: "alias", run: "echo selected", command: "echo ignored" },
-									{ id: " ", command: " " },
-									{ id: "pipe-space", pipeline: " " },
-								],
-							}),
-						},
-					],
-				},
-			],
+			steps,
 			graph: {
 				nodes: [{ id: "group", type: "parallel", label: "group", shape: "box" }],
 				edges: [],
@@ -157,51 +160,41 @@ describe("parallel view projection", () => {
 	});
 
 	it.each([
-		"branches: [",
-		"branches: []",
-		"branches: &cycle [*cycle]",
-		"wait: later\nbranches: [{id: child, command: echo hi}]",
-		"wait: null\nbranches: [{id: child, command: echo hi}]",
-		"branches: [{id: child, workflow: other.lobster}]",
-		"branches: [{id: child, command: echo hi, pipeline: json}]",
-		'branches: [{id: child, run: "", command: echo ignored}]',
-		'branches: [{id: child, run: " ", pipeline: json}]',
-		"branches: [{id: same, command: echo a}, {id: same, command: echo b}]",
-		"branches: [{id: group, command: echo a}]",
-	])(
-		"rejects malformed or colliding branch definitions without returning a partial graph",
-		(value) => {
-			expect(() =>
-				graphFor({
-					id: "file:invalid",
-					name: "Invalid",
-					source: "file",
-					steps: [{ id: "group", fields: [{ name: "parallel", value }] }],
-					graph: {
-						nodes: [{ id: "group", type: "parallel", label: "group", shape: "box" }],
-						edges: [],
-					},
-				}),
-			).toThrow(/Cannot visualize parallel step/);
+		null,
+		{ branches: [] },
+		{ branches: [null] },
+		{ branches: [{ id: "child", run: 2 }] },
+		{ wait: "later", branches: [{ id: "child", command: "echo hi" }] },
+		{
+			branches: [
+				{ id: "same", command: "echo a" },
+				{ id: "same", command: "echo b" },
+			],
 		},
-	);
+		{ branches: [{ id: "group", command: "echo a" }] },
+	])("rejects malformed structure or colliding ids at the viewer boundary", (parallel) => {
+		expect(() =>
+			graphFor({
+				id: "file:invalid",
+				name: "Invalid",
+				source: "file",
+				steps: [{ id: "group", parallel } as WorkflowStep],
+				graph: {
+					nodes: [{ id: "group", type: "parallel", label: "group", shape: "box" }],
+					edges: [],
+				},
+			}),
+		).toThrow(/Cannot visualize parallel step/);
+	});
 });
 
 describe("loop view projection", () => {
-	function loopWorkflow(steps?: string): LobsterWorkflowDetail {
+	function loopWorkflow(steps?: WorkflowStep[]): LobsterWorkflowDetail {
 		return {
 			id: "file:loop",
 			name: "Loop",
 			source: "file",
-			steps: [
-				{
-					id: "loop",
-					fields: [
-						{ name: "for_each", value: "$items.json" },
-						...(steps === undefined ? [] : [{ name: "steps", value: steps }]),
-					],
-				},
-			],
+			steps: [{ id: "loop", for_each: "$items.json", ...(steps === undefined ? {} : { steps }) }],
 			graph: {
 				nodes: [{ id: "loop", type: "for_each", label: "Loop items", shape: "box" }],
 				edges: [],
@@ -209,28 +202,18 @@ describe("loop view projection", () => {
 		};
 	}
 
-	it("contains the ordered loop body and return edge without changing native inputs or colliding with other ids", () => {
-		const workflow = loopWorkflow(
-			stringify([
-				{ id: "same", command: "printf hello", env: { MODE: "test" } },
-				{ id: "filter", pipeline: "json", stdin: "$same.stdout" },
-				{ id: "last::join", run: "", command: "ignored", approval: true },
-			]),
-		);
+	it("contains the ordered body and return edge without mutating raw commands or colliding ids", () => {
+		const workflow = loopWorkflow([
+			{ id: "same", command: "printf hello\\n", env: { MODE: "test" } },
+			{ id: "filter", pipeline: "json", stdin: "$same.stdout" },
+			{ id: "last::join", run: "", command: "ignored" },
+		]);
 		workflow.steps!.push(
 			{
 				id: "loop::step:last",
-				fields: [
-					{
-						name: "parallel",
-						value: stringify({ branches: [{ id: "loop::step:same:2", command: "echo branch" }] }),
-					},
-				],
+				parallel: { branches: [{ id: "loop::step:same:2", command: "echo branch" }] },
 			},
-			{
-				id: "other",
-				fields: [{ name: "steps", value: stringify([{ id: "same", command: "echo other" }]) }],
-			},
+			{ id: "other", for_each: "$items.json", steps: [{ id: "same", command: "echo other" }] },
 		);
 		workflow.graph!.nodes.push(
 			{ id: "loop::step:same", type: "run", label: "Reserved", shape: "box" },
@@ -258,7 +241,6 @@ describe("loop view projection", () => {
 			{ name: "command", value: "printf hello", language: "bash" },
 			{ name: "env", value: "MODE: test" },
 		]);
-		expect(children[2]!.fields).toContainEqual({ name: "approval", value: "true" });
 		expect(visual.edges).toEqual(
 			expect.arrayContaining([
 				{ from: "loop", to: "loop::step:same", label: "next" },
@@ -274,17 +256,14 @@ describe("loop view projection", () => {
 
 	it.each([
 		[{ run: "echo chosen", command: "echo ignored" }, "run"],
-		[{ pipeline: "json", command: "echo ignored" }, "pipeline"],
+		[{ pipeline: "json" }, "pipeline"],
 		[{ pipeline: " ", command: "echo chosen" }, "run"],
 		[{ run: "", command: "echo ignored" }, "step"],
-		[{ workflow: "child.lobster", pipeline: "json" }, "step"],
-		[{ parallel: { branches: [] }, command: "echo ignored" }, "step"],
-		[{ for_each: "$items.json", steps: [{ id: "nested", command: "echo nested" }] }, "step"],
-		[{ approval: true, input: { prompt: "Ignored" } }, "step"],
-	])(
-		"matches inner-loop execution precedence without inventing nested execution or approval",
+	] as const)(
+		"uses the engine's execution kind for loader-admitted loop bodies",
 		(fields, type) => {
-			const visual = projectWorkflowGraph(loopWorkflow(stringify([{ id: "inner", ...fields }])));
+			const workflow = loopWorkflow([{ id: "inner", ...fields }]);
+			const visual = projectWorkflowGraph(workflow);
 			expect(visual.nodes[1]).toMatchObject({
 				title: "inner",
 				type,
@@ -296,7 +275,7 @@ describe("loop view projection", () => {
 	);
 
 	it("distinguishes an empty body from missing metadata without adding dangling edges", () => {
-		expect(projectWorkflowGraph(loopWorkflow("[]"))).toEqual({
+		expect(projectWorkflowGraph(loopWorkflow([]))).toEqual({
 			nodes: [
 				{
 					id: "loop",
@@ -313,19 +292,19 @@ describe("loop view projection", () => {
 	});
 
 	it.each([
-		"[",
-		"null",
-		"{}",
-		"[null]",
-		"[{command: echo missing}]",
-		"[{id: '', command: echo empty}]",
-		"[{id: duplicate}, {id: duplicate}]",
-		"[{id: inner, run: null}]",
-		"[{id: inner, command: {invalid: true}}]",
-		"[{id: inner, pipeline: 123}]",
-		"&cycle [*cycle]",
-		stringify(Array.from({ length: 501 }, (_, index) => ({ id: `step_${index}` }))),
-	])("rejects malformed loop metadata rather than returning a partial graph", (value) => {
-		expect(() => projectWorkflowGraph(loopWorkflow(value))).toThrow(/Cannot visualize loop step/);
+		null,
+		{},
+		[null],
+		[{ command: "echo missing" }],
+		[{ id: "", command: "echo empty" }],
+		[{ id: "duplicate" }, { id: "duplicate" }],
+		[{ id: "inner", run: null }],
+		[{ id: "inner", command: {} }],
+		[{ id: "inner", pipeline: 123 }],
+		Array.from({ length: 501 }, (_, index) => ({ id: `step_${index}` })),
+	])("rejects malformed loop structure at the viewer boundary", (steps) => {
+		expect(() => projectWorkflowGraph(loopWorkflow(steps as WorkflowStep[]))).toThrow(
+			/Cannot visualize loop step/,
+		);
 	});
 });

@@ -1,4 +1,9 @@
-import type { LobsterPageTarget, LobsterViewContext } from "@lobster/ui/view-context";
+import {
+	WorkflowViewError,
+	workflowErrorMessage,
+	type LobsterPageTarget,
+	type LobsterViewContext,
+} from "@lobster/ui/view-context";
 import type {
 	LobsterWorkflowFileResult,
 	LobsterWorkflowFilesResult,
@@ -15,15 +20,11 @@ type WorkflowTransport = {
 };
 
 const messages = {
-	request: "This request is not supported by the development preview.",
-	params:
-		"Invalid development request parameters. Select a workflow or a source file from its tree.",
-	event: "This event is not supported by the development preview.",
+	params: "Select a workflow or a source file from its tree.",
 	page: "This page is not supported by the development preview.",
 	pageParams: "Invalid development page parameters. Select a workflow from the list.",
 	disconnected: "The development server is disconnected. Check that it is running and retry.",
 };
-const safeMessages = new Set(Object.values(messages));
 
 function hasKeys(value: unknown, allowed: readonly string[]): value is Record<string, unknown> {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -39,24 +40,34 @@ function workflowId(value: unknown): value is string {
 }
 
 function pageHref(target: LobsterPageTarget): string {
-	if (!hasKeys(target, ["id", "params"])) throw new Error(messages.pageParams);
+	if (!hasKeys(target, ["id", "params"])) throw new WorkflowViewError(messages.pageParams);
 	if (target.id === "workflows") {
 		if (target.params !== undefined && !hasKeys(target.params, [])) {
-			throw new Error(messages.pageParams);
+			throw new WorkflowViewError(messages.pageParams);
 		}
 		return "/";
 	}
-	if (target.id !== "workflow") throw new Error(messages.page);
+	if (target.id !== "workflow") throw new WorkflowViewError(messages.page);
 	if (!hasKeys(target.params, ["workflowId"]) || !workflowId(target.params.workflowId)) {
-		throw new Error(messages.pageParams);
+		throw new WorkflowViewError(messages.pageParams);
 	}
 	return `/workflow?id=${encodeURIComponent(target.params.workflowId)}`;
 }
 
-/**
- * Development adapter for Lobster views: local reads, navigation, and lifecycle.
- * Unknown capabilities fail explicitly; there is no workflow execution transport.
- */
+/** The server marks only known, sanitized workflow errors as safe to display. */
+export async function readPreview(url: string, signal: AbortSignal) {
+	const response = await fetch(url, { signal, credentials: "omit" });
+	const body = await response.json();
+	if (!response.ok) {
+		if (body?.error?.type === "workflow" && typeof body.error.message === "string") {
+			throw new WorkflowViewError(body.error.message);
+		}
+		throw new Error("Workflow request failed");
+	}
+	return body;
+}
+
+/** Local reads, navigation, and view lifetimes; no workflow execution transport. */
 export function createDevelopmentHost({
 	transport,
 	navigate,
@@ -83,8 +94,18 @@ export function createDevelopmentHost({
 			signal.throwIfAborted();
 			const lifetime = new AbortController();
 			const listeners = new Set<() => void>();
-			const events = new Set<(payload: unknown) => void>();
+			const events = new Set<() => void>();
 			const assertActive = () => lifetime.signal.throwIfAborted();
+			const read = async <T>(operation: () => Promise<T>): Promise<T> => {
+				assertActive();
+				if (!connected) throw new WorkflowViewError(messages.disconnected);
+				const result = await operation();
+				assertActive();
+				return result;
+			};
+			const assertId = (id: string) => {
+				if (!workflowId(id)) throw new WorkflowViewError(messages.params);
+			};
 			const dispose = () => {
 				if (lifetime.signal.aborted) return;
 				lifetime.abort();
@@ -101,7 +122,7 @@ export function createDevelopmentHost({
 				},
 				emitWorkflowsChanged() {
 					for (const listener of events) {
-						if (!lifetime.signal.aborted) listener({});
+						if (!lifetime.signal.aborted) listener();
 					}
 				},
 				dispose,
@@ -121,44 +142,24 @@ export function createDevelopmentHost({
 						return connected;
 					},
 				},
-				async request<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
-					assertActive();
-					let read: () => Promise<
-						| LobsterWorkflowsResult
-						| LobsterWorkflowResult
-						| LobsterWorkflowFilesResult
-						| LobsterWorkflowFileResult
-					>;
-					if (method === "lobster.workflows.list") {
-						if (!hasKeys(params, [])) throw new Error(messages.params);
-						read = () => transport.list(lifetime.signal);
-					} else if (method === "lobster.workflows.get" || method === "lobster.workflows.files") {
-						if (!hasKeys(params, ["id"]) || !workflowId(params.id)) {
-							throw new Error(messages.params);
-						}
-						const id = params.id;
-						read = () =>
-							method === "lobster.workflows.get"
-								? transport.get(id, lifetime.signal)
-								: transport.files(id, lifetime.signal);
-					} else if (method === "lobster.workflows.file") {
-						if (
-							!hasKeys(params, ["id", "path"]) ||
-							!workflowId(params.id) ||
-							!workflowId(params.path)
-						) {
-							throw new Error(messages.params);
-						}
-						const { id, path } = params;
-						read = () => transport.file(id, path, lifetime.signal);
-					} else {
-						throw new Error(messages.request);
-					}
-					if (!connected) throw new Error(messages.disconnected);
-					const result = await read();
-					assertActive();
-					// The view's caller-selected result type is retained only at this adapter boundary.
-					return result as T;
+				workflows: {
+					list: () => read(() => transport.list(lifetime.signal)),
+					get: (id) =>
+						read(() => {
+							assertId(id);
+							return transport.get(id, lifetime.signal);
+						}),
+					files: (id) =>
+						read(() => {
+							assertId(id);
+							return transport.files(id, lifetime.signal);
+						}),
+					file: (id, path) =>
+						read(() => {
+							assertId(id);
+							assertId(path);
+							return transport.file(id, path, lifetime.signal);
+						}),
 				},
 				subscribe(listener) {
 					assertActive();
@@ -167,21 +168,14 @@ export function createDevelopmentHost({
 						listeners.delete(listener);
 					};
 				},
-				onEvent(event, listener) {
+				onWorkflowsChanged(listener) {
 					assertActive();
-					if (event !== "lobster.workflows-changed") throw new Error(messages.event);
 					events.add(listener);
 					return () => {
 						events.delete(listener);
 					};
 				},
-				redact(text) {
-					assertActive();
-					// Mask untrusted errors before displaying them; source content has its own explicit view.
-					return safeMessages.has(text)
-						? text
-						: "Development request failed. Check the development server and workflow file. Details are hidden by the preview adapter.";
-				},
+				errorMessage: workflowErrorMessage,
 				navigation: {
 					pageHref(target) {
 						assertActive();

@@ -1,12 +1,13 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-	LobsterWorkflowDetail,
-	LobsterWorkflowResult,
-	LobsterWorkflowFilesResult,
-} from "../workflow-types.js";
+import type { LobsterWorkflowDetail, LobsterWorkflowResult } from "../workflow-types.js";
 import { mountWorkflow } from "./index.js";
-import type { LobsterDialogProps, LobsterViewContext } from "./view-context.js";
+import {
+	WorkflowViewError,
+	workflowErrorMessage,
+	type LobsterDialogProps,
+	type LobsterViewContext,
+} from "./view-context.js";
 
 const cleanups: Array<() => void> = [];
 beforeEach(() => {
@@ -47,7 +48,7 @@ function workflow(filename: string, child?: string): LobsterWorkflowDetail {
 		steps: [
 			{
 				id: child ? "child" : "greet",
-				fields: [{ name: child ? "workflow" : "command", value: child ?? "echo hello" }],
+				...(child ? { workflow: child } : { command: "echo hello" }),
 			},
 		],
 	};
@@ -60,33 +61,39 @@ async function fixture(child = "nested/child.lobster") {
 	const controller = new AbortController();
 	const container = document.createElement("div");
 	document.body.append(container);
-	const events = new Set<(payload: unknown) => void>();
+	const events = new Set<() => void>();
 	const subscriptions = new Set<() => void>();
 	const dialogs: Array<{ props: LobsterDialogProps; element: HTMLElement; dispose: () => void }> =
 		[];
-	const request = vi.fn(
-		async (
-			method: string,
-			params?: Record<string, unknown>,
-		): Promise<LobsterWorkflowResult | LobsterWorkflowFilesResult> => {
-			const detail = children.get(String(params?.id));
-			if (!detail) {
-				throw new Error("Workflow file is unavailable");
-			}
-			if (method === "lobster.workflows.files") {
-				return {
-					files: [{ path: detail.definition!.filename, language: detail.definition!.language }],
-					defaultPath: detail.definition!.filename,
-					truncated: false,
-				};
-			}
-			return { workflow: detail };
-		},
-	);
+	const detailFor = (id: string) => {
+		const detail = children.get(id);
+		if (!detail) throw new WorkflowViewError("Workflow file is unavailable");
+		return detail;
+	};
+	const get = vi.fn(async (id: string): Promise<LobsterWorkflowResult> => ({
+		workflow: detailFor(id),
+	}));
 	const host: LobsterViewContext["host"] = {
 		connection: { connected: true },
-		request: request as LobsterViewContext["host"]["request"],
-		redact: (text) => text,
+		workflows: {
+			get,
+			async list() {
+				return { workflows: [...children.values()] };
+			},
+			async files(id) {
+				const definition = detailFor(id).definition!;
+				return {
+					files: [{ path: definition.filename, language: definition.language }],
+					defaultPath: definition.filename,
+					truncated: false,
+				};
+			},
+			async file(id, path) {
+				const definition = detailFor(id).definition!;
+				return { file: { path, language: definition.language, text: definition.text } };
+			},
+		},
+		errorMessage: workflowErrorMessage,
 		navigation: { pageHref: () => "/", openPage: vi.fn() },
 		subscribe(listener) {
 			subscriptions.add(listener);
@@ -94,7 +101,7 @@ async function fixture(child = "nested/child.lobster") {
 				subscriptions.delete(listener);
 			};
 		},
-		onEvent(_event, listener) {
+		onWorkflowsChanged(listener) {
 			events.add(listener);
 			return () => {
 				events.delete(listener);
@@ -126,7 +133,7 @@ async function fixture(child = "nested/child.lobster") {
 	return {
 		container,
 		context,
-		request,
+		get,
 		children,
 		dialogs,
 		controller,
@@ -148,7 +155,7 @@ async function fixture(child = "nested/child.lobster") {
 			return card;
 		},
 		async change() {
-			await act(async () => events.forEach((listener) => listener({})));
+			await act(async () => events.forEach((listener) => listener()));
 		},
 		async update() {
 			await act(async () => view?.update?.(context));
@@ -163,9 +170,7 @@ describe("subworkflow dialog", () => {
 		f.add(child);
 		const parentCanvas = f.container.querySelector(".react-flow");
 		const trigger = await f.open();
-		expect(f.request.mock.calls.findLast(([method]) => method === "lobster.workflows.get")).toEqual(
-			["lobster.workflows.get", { id: child.id }],
-		);
+		expect(f.get).toHaveBeenLastCalledWith(child.id);
 		const dialog = f.dialogs[0]!;
 		expect(dialog.props.returnFocusTarget).toBe(trigger);
 		expect(dialog.element.querySelector(".lobster-graph__step--run")?.textContent).toContain(
@@ -191,9 +196,7 @@ describe("subworkflow dialog", () => {
 		f.add(grandchild);
 		await f.open(f.container, true);
 		await f.open(f.dialogs[0]!.element);
-		expect(f.request.mock.calls.findLast(([method]) => method === "lobster.workflows.get")).toEqual(
-			["lobster.workflows.get", { id: grandchild.id }],
-		);
+		expect(f.get).toHaveBeenLastCalledWith(grandchild.id);
 		expect(f.events.size).toBe(3);
 		f.context.props = { workflowId: grandchild.id };
 		await f.update();
@@ -210,7 +213,7 @@ describe("subworkflow dialog", () => {
 		const pending = new Promise<LobsterWorkflowResult>((resolve) => {
 			complete = resolve;
 		});
-		f.request.mockReturnValueOnce(pending);
+		f.get.mockReturnValueOnce(pending);
 		await f.open();
 		const dialog = f.dialogs[0]!;
 		await act(async () => dialog.props.onCancel());
@@ -248,14 +251,12 @@ describe("subworkflow dialog", () => {
 	});
 
 	it("shows an unresolved-target message without making a child request", async () => {
-		const f = await fixture("'${args.target}'");
+		const f = await fixture("${target}.lobster");
 		await f.open();
 		expect(f.dialogs[0]!.element.querySelector('[role="alert"]')?.textContent).toMatch(
 			/dynamic|runtime|template/i,
 		);
-		expect(
-			f.request.mock.calls.filter(([method]) => method === "lobster.workflows.get"),
-		).toHaveLength(1);
+		expect(f.get).toHaveBeenCalledTimes(1);
 		await act(async () =>
 			f.dialogs[0]!.element.querySelector<HTMLButtonElement>("button")!.click(),
 		);

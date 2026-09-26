@@ -1,6 +1,7 @@
 import { afterEach, vi } from "vitest";
 import type { LobsterSourceLanguage } from "../workflow-types.js";
 import { mountWorkflow, mountWorkflows, type LobsterViewContext } from "./index.js";
+import { workflowErrorMessage } from "./workflow-errors.js";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -18,24 +19,25 @@ export async function createViewFixture(
 ) {
 	const abort = new AbortController();
 	const listeners = new Set<() => void>();
-	const events = new Map<string, Set<(payload: unknown) => void>>();
+	const events = new Set<() => void>();
+	const workflows = {
+		list: vi.fn<LobsterViewContext["host"]["workflows"]["list"]>(),
+		get: vi.fn<LobsterViewContext["host"]["workflows"]["get"]>(),
+		files: vi.fn<LobsterViewContext["host"]["workflows"]["files"]>(),
+		file: vi.fn<LobsterViewContext["host"]["workflows"]["file"]>(),
+	};
 	const connection = { connected: true };
 	const host: LobsterViewContext["host"] = {
-		redact: (text) => text,
+		errorMessage: workflowErrorMessage,
 		connection,
-		request: vi.fn(),
+		workflows,
 		subscribe(listener) {
 			listeners.add(listener);
 			return () => listeners.delete(listener);
 		},
-		onEvent(event, listener) {
-			let subscriptions = events.get(event);
-			if (!subscriptions) {
-				subscriptions = new Set();
-				events.set(event, subscriptions);
-			}
-			subscriptions.add(listener);
-			return () => subscriptions.delete(listener);
+		onWorkflowsChanged(listener) {
+			events.add(listener);
+			return () => events.delete(listener);
 		},
 		get components(): never {
 			throw new Error("No host component fixture installed");
@@ -64,13 +66,13 @@ export async function createViewFixture(
 		abort.abort();
 	});
 	return {
-		request: vi.mocked(host.request),
+		...workflows,
 		mount,
 		container,
 		abort,
 		events,
 		changed() {
-			events.get("lobster.workflows-changed")?.forEach((listener) => listener({}));
+			events.forEach((listener) => listener());
 		},
 		present(presented: boolean) {
 			context.presented = presented;
@@ -96,7 +98,10 @@ export function mockSource(
 	text: string,
 	language: LobsterSourceLanguage = "yaml",
 ) {
-	fixture.request
-		.mockResolvedValueOnce({ files: [{ path, language }], defaultPath: path, truncated: false })
-		.mockResolvedValueOnce({ file: { path, language, text } });
+	fixture.files.mockResolvedValueOnce({
+		files: [{ path, language }],
+		defaultPath: path,
+		truncated: false,
+	});
+	fixture.file.mockResolvedValueOnce({ file: { path, language, text } });
 }

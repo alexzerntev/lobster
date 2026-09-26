@@ -37,7 +37,7 @@ export function subscribeWorkflowChanges(
 		};
 		queueMicrotask(() => void refresh());
 	};
-	const unsubscribe = host.onEvent("lobster.workflows-changed", () => {
+	const unsubscribe = host.onWorkflowsChanged(() => {
 		if (!disposed && relevant()) {
 			pending = true;
 			flush();

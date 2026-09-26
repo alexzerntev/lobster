@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { stringify } from "yaml";
 import { graphFor, layoutWorkflowGraph } from "./graph-layout.js";
 
 describe("workflow graph topology", () => {
@@ -9,18 +8,13 @@ describe("workflow graph topology", () => {
 			name: "Example",
 			source: "file",
 			steps: [
-				{ id: "finish", fields: [{ name: "run", value: "echo done" }] },
+				{ id: "finish", run: "echo done" },
 				{
 					id: "parallel",
-					fields: [
-						{
-							name: "parallel",
-							value: "branches:\n  - id: branch\n    pipeline: head --n 1 | json",
-						},
-					],
+					parallel: { branches: [{ id: "branch", pipeline: "head --n 1 | json" }] },
 				},
-				{ id: "loop", fields: [{ name: "for_each", value: "$start.json" }] },
-				{ id: "start", fields: [{ name: "run", value: "echo start" }] },
+				{ id: "loop", for_each: "$start.json" },
+				{ id: "start", run: "echo start" },
 			],
 			graph: {
 				nodes: [
@@ -74,7 +68,7 @@ describe("workflow graph topology", () => {
 				id: "file:example",
 				name: "Example",
 				source: "file",
-				steps: [{ id: "step", fields: [{ name: "run", value: "echo hello" }] }],
+				steps: [{ id: "step", run: "echo hello" }],
 			}),
 		).toEqual({ nodes: [], edges: [] });
 	});
@@ -100,17 +94,10 @@ describe("workflow graph topology", () => {
 				steps: [
 					{
 						id: "each",
-						fields: [
-							{
-								name: "steps",
-								value: stringify(
-									Array.from({ length: count }, (_, i) => ({
-										id: `body${i}`,
-										command: "echo item",
-									})),
-								),
-							},
-						],
+						steps: Array.from({ length: count }, (_, i) => ({
+							id: `body${i}`,
+							command: "echo item",
+						})),
 					},
 				],
 			});
@@ -226,14 +213,14 @@ describe("workflow graph topology", () => {
 			steps: [
 				{
 					id: "group",
-					fields: [
-						{
-							name: "parallel",
-							value:
-								"wait: any\nbranches:\n  - id: left\n    command: echo left\n  - id: right\n    pipeline: json",
-						},
-						{ name: "approval", value: "true" },
-					],
+					parallel: {
+						wait: "any",
+						branches: [
+							{ id: "left", command: "echo left" },
+							{ id: "right", pipeline: "json" },
+						],
+					},
+					approval: true,
 				},
 			],
 			graph: {

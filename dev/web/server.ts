@@ -85,7 +85,10 @@ const server = await createServer({
 							send(404, { error: "Unknown endpoint." });
 						} catch (error) {
 							send(error instanceof WorkflowApiError ? error.statusCode : 500, {
-								error: error instanceof Error ? error.message : "Could not read workflow.",
+								error:
+									error instanceof WorkflowApiError
+										? { type: "workflow", message: error.message }
+										: { type: "internal", message: "Could not read workflow." },
 							});
 						}
 					})();

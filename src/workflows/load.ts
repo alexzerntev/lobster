@@ -2,13 +2,20 @@ import { promises as fsp } from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { compileCached } from "../validation.js";
-import type { WorkflowFile, WorkflowStep, ParallelConfig } from "./types.js";
+import type { WorkflowFile, ParallelConfig } from "./types.js";
+import { isApprovalStep, isInputStep } from "./step.js";
+
+export { getStepExecution, isApprovalStep, isInputStep } from "./step.js";
 
 export async function loadWorkflowFile(filePath: string): Promise<WorkflowFile> {
 	const text = await fsp.readFile(filePath, "utf8");
 	const ext = path.extname(filePath).toLowerCase();
 	const parsed = ext === ".json" ? JSON.parse(text) : parseYaml(text);
+	return validateWorkflowDocument(parsed);
+}
 
+/** Validate an already parsed document without rereading or executing its source. */
+export function validateWorkflowDocument(parsed: unknown): WorkflowFile {
 	if (!parsed || typeof parsed !== "object") {
 		throw new Error("Workflow file must be a JSON/YAML object");
 	}
@@ -418,36 +425,4 @@ export async function loadWorkflowFile(filePath: string): Promise<WorkflowFile> 
 	}
 
 	return parsed as WorkflowFile;
-}
-
-export function isApprovalStep(approval: WorkflowStep["approval"]) {
-	if (approval === true) return true;
-	if (typeof approval === "string" && approval.trim().length > 0) return true;
-	if (approval && typeof approval === "object" && !Array.isArray(approval)) return true;
-	return false;
-}
-
-export function isInputStep(input: WorkflowStep["input"]) {
-	return Boolean(input && typeof input === "object" && !Array.isArray(input));
-}
-
-export function getStepExecution(step: WorkflowStep) {
-	if (step.parallel && typeof step.parallel === "object" && !Array.isArray(step.parallel)) {
-		return { kind: "parallel" as const, value: step.parallel };
-	}
-
-	if (typeof step.workflow === "string" && step.workflow.trim()) {
-		return { kind: "workflow" as const, value: step.workflow };
-	}
-
-	if (typeof step.pipeline === "string" && step.pipeline.trim()) {
-		return { kind: "pipeline" as const, value: step.pipeline };
-	}
-
-	const shellCommand = typeof step.run === "string" ? step.run : step.command;
-	if (typeof shellCommand === "string" && shellCommand.trim()) {
-		return { kind: "shell" as const, value: shellCommand };
-	}
-
-	return { kind: "none" as const };
 }

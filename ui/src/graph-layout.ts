@@ -1,7 +1,8 @@
 import { Graph, layout } from "@dagrejs/dagre";
 import { MarkerType, type Edge, type Node, type Rect } from "@xyflow/react";
-import type { LobsterWorkflowDetail, LobsterWorkflowStep } from "../workflow-types.js";
+import type { LobsterWorkflowDetail } from "../workflow-types.js";
 import { projectWorkflowGraph, type ProjectedNode } from "./graph-projection.js";
+import type { WorkflowFields } from "./workflow-fields.js";
 
 type LayoutPoint = { x: number; y: number };
 type LayoutNode = {
@@ -32,7 +33,7 @@ type LayoutGraph = {
 export type WorkflowNode = Node<
 	Pick<ProjectedNode, "label" | "shape" | "parentId" | "title" | "isContainer"> & {
 		type: ProjectedNode["type"] | "builtin";
-		fields: LobsterWorkflowStep["fields"];
+		fields: WorkflowFields;
 	},
 	"lobster"
 >;
@@ -319,7 +320,7 @@ export function graphFor(workflow: LobsterWorkflowDetail): {
 } {
 	// Built-ins have no native step graph. Show the implementation as one opaque card.
 	if (workflow.source === "builtin" && !workflow.graph) {
-		const fields: LobsterWorkflowStep["fields"] = [];
+		const fields: WorkflowFields = [];
 		if (workflow.description) {
 			fields.push({ name: "description", value: workflow.description });
 		}

@@ -1,57 +1,46 @@
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { extractStepRefs, graphStepType } from "../../src/workflows/graph-model.js";
 import type { WorkflowGraph } from "../../src/workflows/graph-types.js";
-import type { LobsterWorkflowDetail, LobsterWorkflowStep } from "../workflow-types.js";
+import { getStepExecution } from "../../src/workflows/step.js";
+import type { ParallelBranch, ParallelConfig, WorkflowStep } from "../../src/workflows/types.js";
+import type { LobsterWorkflowDetail } from "../workflow-types.js";
+import { WorkflowViewError } from "./workflow-errors.js";
+import { workflowField as field, workflowFields, type WorkflowFields } from "./workflow-fields.js";
 
 export type ProjectedNode = Omit<WorkflowGraph["nodes"][number], "type"> & {
 	type: WorkflowGraph["nodes"][number]["type"] | "join";
 	parentId?: string;
 	isContainer?: boolean;
 	title?: string;
-	fields: LobsterWorkflowStep["fields"];
+	fields: WorkflowFields;
 };
-type Branch = { id: string; type: "run" | "pipeline"; value: Record<string, unknown> };
+type Branch = { id: string; type: "run" | "pipeline"; value: ParallelBranch };
 type LoopStep = {
 	id: string;
 	title: string;
 	type: "run" | "pipeline" | "step";
-	value: Record<string, unknown>;
+	value: WorkflowStep;
 };
 type Parallel = {
-	value: Record<string, unknown>;
+	value: ParallelConfig;
 	wait: "all" | "any";
 	branches: Branch[];
 	joinId: string;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function parseField(value: string): unknown {
-	// The API already bounds and sanitizes fields. Alias expansion is unnecessary for
-	// its serialized metadata and must not introduce cycles in the browser projection.
-	return parseYaml(value, { maxAliasCount: 0 });
-}
-
-function field(name: string, value: unknown): LobsterWorkflowStep["fields"][number] {
-	if ((name === "command" || name === "run") && typeof value === "string") {
-		return { name, value, language: "bash" };
-	}
-	return { name, value: stringifyYaml(value, { lineWidth: 0 }).replace(/^([^\n]*)\n$/, "$1") };
+function hasStringCommands(step: WorkflowStep): boolean {
+	return [step.run, step.command, step.pipeline].every(
+		(value) => value === undefined || typeof value === "string",
+	);
 }
 
 function parallelMetadata(
 	nodeId: string,
-	fields: LobsterWorkflowStep["fields"],
-): Omit<Parallel, "joinId"> {
+	step: WorkflowStep | undefined,
+): Omit<Parallel, "joinId"> | undefined {
+	const value = step?.parallel;
+	if (value === undefined) return undefined;
 	try {
-		const text = fields.find((entry) => entry.name === "parallel")?.value;
-		if (text === undefined) {
-			throw new Error("Missing parallel definition");
-		}
-		const value = parseField(text);
 		if (
-			!isRecord(value) ||
 			!Array.isArray(value.branches) ||
 			value.branches.length === 0 ||
 			value.branches.length > 500
@@ -59,98 +48,50 @@ function parallelMetadata(
 			throw new Error("Invalid branches");
 		}
 		const wait = value.wait === undefined ? "all" : value.wait;
-		if (wait !== "all" && wait !== "any") {
-			throw new Error("Invalid wait mode");
-		}
+		if (wait !== "all" && wait !== "any") throw new Error("Invalid wait mode");
 		const branches = value.branches.map((branch): Branch => {
-			if (!isRecord(branch) || typeof branch.id !== "string" || !branch.id) {
-				throw new Error("Missing branch id");
-			}
-			for (const name of ["run", "command", "pipeline"]) {
-				if (branch[name] !== undefined && typeof branch[name] !== "string") {
-					throw new Error("Invalid branch command");
-				}
-			}
-			const shell = typeof branch.run === "string" ? branch.run : branch.command;
-			const run = Boolean(shell);
-			const pipeline = Boolean(branch.pipeline);
-			if (Number(run) + Number(pipeline) !== 1) {
-				throw new Error("Invalid branch execution");
-			}
-			return { id: branch.id, type: pipeline ? "pipeline" : "run", value: branch };
+			if (!branch || typeof branch.id !== "string" || !branch.id || !hasStringCommands(branch))
+				throw new Error("Invalid branch definition");
+			// A whitespace-only pipeline is loader-admitted; keep its declared display kind.
+			const type = branch.pipeline ? "pipeline" : graphStepType(branch);
+			if (type !== "run" && type !== "pipeline") throw new Error("Invalid branch execution");
+			return { id: branch.id, type, value: branch };
 		});
 		return { value, wait, branches };
 	} catch {
-		throw new Error(
+		throw new WorkflowViewError(
 			`Cannot visualize parallel step "${nodeId}". Its branch definitions must contain unique ids and a command or pipeline.`,
 		);
 	}
 }
 
-function loopMetadata(
-	nodeId: string,
-	fields: LobsterWorkflowStep["fields"],
-): LoopStep[] | undefined {
-	const text = fields.find((entry) => entry.name === "steps")?.value;
-	if (text === undefined) {
-		return undefined;
-	}
+function loopMetadata(nodeId: string, step: WorkflowStep | undefined): LoopStep[] | undefined {
+	const value = step?.steps;
+	if (value === undefined) return undefined;
 	try {
-		const value = parseField(text);
-		if (!Array.isArray(value) || value.length > 500) {
-			throw new Error("Invalid loop steps");
-		}
+		if (!Array.isArray(value) || value.length > 500) throw new Error("Invalid loop steps");
 		const ids = new Set<string>();
-		return value.map((step): LoopStep => {
-			if (!isRecord(step) || typeof step.id !== "string" || !step.id || ids.has(step.id)) {
+		return value.map((child): LoopStep => {
+			if (
+				!child ||
+				typeof child.id !== "string" ||
+				!child.id ||
+				ids.has(child.id) ||
+				!hasStringCommands(child)
+			) {
 				throw new Error("Invalid loop step id");
 			}
-			ids.add(step.id);
-			for (const name of ["run", "command", "pipeline"]) {
-				if (step[name] !== undefined && typeof step[name] !== "string") {
-					throw new Error("Invalid loop command");
-				}
-			}
-			// Match getStepExecution's precedence, but only shell and pipeline execute
-			// inside a loop. Its other kinds produce a generic result, not nested graphs.
-			let type: LoopStep["type"] = "step";
-			if (
-				!isRecord(step.parallel) &&
-				!(typeof step.workflow === "string" && step.workflow.trim())
-			) {
-				const shell = typeof step.run === "string" ? step.run : step.command;
-				if (typeof step.pipeline === "string" && step.pipeline.trim()) {
-					type = "pipeline";
-				} else if (typeof shell === "string" && shell.trim()) {
-					type = "run";
-				}
-			}
-			return { id: step.id, title: step.id, type, value: step };
+			ids.add(child.id);
+			const execution = getStepExecution(child);
+			const type =
+				execution.kind === "shell" ? "run" : execution.kind === "pipeline" ? "pipeline" : "step";
+			return { id: child.id, title: child.id, type, value: child };
 		});
 	} catch {
-		throw new Error(
+		throw new WorkflowViewError(
 			`Cannot visualize loop step "${nodeId}". Its steps must be an array of objects with unique ids and string command fields.`,
 		);
 	}
-}
-
-function references(value: unknown): Set<string> {
-	const found = new Set<string>();
-	const visit = (entry: unknown) => {
-		if (typeof entry === "string") {
-			for (const match of entry.matchAll(
-				/\$([A-Za-z0-9_-]+)\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*/g,
-			)) {
-				found.add(match[1]!);
-			}
-		} else if (Array.isArray(entry)) {
-			entry.forEach(visit);
-		} else if (isRecord(entry)) {
-			Object.values(entry).forEach(visit);
-		}
-	};
-	visit(value);
-	return found;
 }
 
 /** A view-only expansion. Lobster's saved definition and exported graph remain unchanged. */
@@ -159,7 +100,7 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 	edges: WorkflowGraph["edges"];
 } {
 	const native = workflow.graph ?? { nodes: [], edges: [] };
-	const metadata = new Map((workflow.steps ?? []).map((step) => [step.id, step.fields]));
+	const metadata = new Map((workflow.steps ?? []).map((step) => [step.id, step]));
 	const usedIds = new Set(native.nodes.map((node) => node.id));
 	const branches = new Set<string>();
 	const parallel = new Map<string, Parallel>();
@@ -178,10 +119,11 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 		if (node.type !== "parallel") {
 			continue;
 		}
-		const projected = parallelMetadata(node.id, metadata.get(node.id) ?? []);
+		const projected = parallelMetadata(node.id, metadata.get(node.id));
+		if (!projected) continue;
 		for (const branch of projected.branches) {
 			if (usedIds.has(branch.id)) {
-				throw new Error(
+				throw new WorkflowViewError(
 					`Cannot visualize parallel step "${node.id}". Branch id "${branch.id}" is already in use.`,
 				);
 			}
@@ -195,7 +137,7 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 	}
 	for (const node of native.nodes) {
 		if (node.type === "for_each") {
-			const steps = loopMetadata(node.id, metadata.get(node.id) ?? []);
+			const steps = loopMetadata(node.id, metadata.get(node.id));
 			if (steps) {
 				for (const step of steps) {
 					step.id = uniqueId(`${node.id}::step:${step.id}`);
@@ -217,7 +159,7 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 		addEdge({ ...edge, from: parallel.get(edge.from)?.joinId ?? edge.from });
 	}
 	const addReferences = (value: unknown, to: string, label: string, branchOnly = false) => {
-		for (const ref of references(value)) {
+		for (const ref of extractStepRefs(value)) {
 			if (branchOnly ? branches.has(ref) : usedIds.has(ref)) {
 				addEdge({ from: parallel.get(ref)?.joinId ?? ref, to, label });
 			}
@@ -225,7 +167,8 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 	};
 	const nodes: ProjectedNode[] = [];
 	for (const node of native.nodes) {
-		const fields = metadata.get(node.id) ?? [];
+		const step = metadata.get(node.id);
+		const fields = step ? workflowFields(step) : [];
 		const group = parallel.get(node.id);
 		const loop = loops.get(node.id);
 		if (group) {
@@ -252,9 +195,7 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 					label: branch.id,
 					shape: "box",
 					parentId: node.id,
-					fields: Object.entries(branch.value)
-						.filter(([name]) => name !== "id")
-						.map(([name, value]) => field(name, value)),
+					fields: workflowFields(branch.value),
 				});
 				addEdge({ from: node.id, to: branch.id, label: "branch" });
 				addReferences(branch.value.stdin, branch.id, "stdin");
@@ -286,9 +227,7 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 					label: step.title,
 					shape: "box",
 					parentId: node.id,
-					fields: Object.entries(step.value)
-						.filter(([name]) => name !== "id")
-						.map(([name, value]) => field(name, value)),
+					fields: workflowFields(step.value),
 				});
 				const next = loop[index + 1] ?? loop[0]!;
 				addEdge({
@@ -302,17 +241,10 @@ export function projectWorkflowGraph(workflow: LobsterWorkflowDetail): {
 		}
 		// The native graph knows only top-level ids. Complete dependencies on visual
 		// branch results without treating loop-local results as top-level outputs.
-		for (const name of ["stdin", "for_each"]) {
-			const value = fields.find((entry) => entry.name === name)?.value;
-			if (value !== undefined) {
-				addReferences(parseField(value), node.id, name, true);
-			}
+		for (const name of ["stdin", "for_each"] as const) {
+			addReferences(step?.[name], node.id, name, true);
 		}
-		const when = fields.find((entry) => entry.name === "when");
-		const condition = fields.find((entry) => entry.name === "condition");
-		const value =
-			(when ? parseField(when.value) : undefined) ??
-			(condition ? parseField(condition.value) : undefined);
+		const value = step?.when ?? step?.condition;
 		if (typeof value === "string" && value.trim()) {
 			const label = `when: ${value.trim()}`;
 			addReferences(value, node.id, label.length > 70 ? `${label.slice(0, 69)}…` : label, true);

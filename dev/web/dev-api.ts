@@ -1,14 +1,11 @@
 import { constants } from "node:fs";
-import { lstat, mkdtemp, open, opendir, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { lstat, open, opendir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { parse as parseYaml } from "yaml";
 import { resolveWorkflowArgs } from "../../src/workflows/file.js";
 import { renderWorkflowGraph, type WorkflowGraph } from "../../src/workflows/graph.js";
-import { graphNodeTypes } from "../../src/workflows/graph-types.js";
-import { loadWorkflowFile } from "../../src/workflows/load.js";
+import { validateWorkflowDocument } from "../../src/workflows/load.js";
 import { listWorkflows } from "../../src/workflows/registry.js";
-import type { WorkflowStep } from "../../src/workflows/types.js";
 
 import type {
 	LobsterWorkflowSummary as WorkflowSummary,
@@ -111,7 +108,10 @@ async function verifyDirectories(rootDir: string, filename = ""): Promise<string
 		directory = path.join(directory, part);
 		const stat = await lstat(directory);
 		if (!stat.isDirectory() || stat.isSymbolicLink()) {
-			throw new Error("Workflow directories must be real directories without symlinks");
+			throw new WorkflowApiError(
+				"Workflow directories must be real directories without symlinks",
+				400,
+			);
 		}
 	}
 	return path.join(workspace, "workflows");
@@ -127,7 +127,10 @@ async function readSource(workspaceDir: string, filename: string): Promise<strin
 	try {
 		const stat = await handle.stat();
 		if (!stat.isFile() || stat.nlink !== 1 || stat.size > maxBytes) {
-			throw new Error("Workflows must be regular files without hardlinks, no larger than 256 KiB");
+			throw new WorkflowApiError(
+				"Workflows must be regular files without hardlinks, no larger than 256 KiB",
+				400,
+			);
 		}
 		// Recheck the directory chain after opening, then read from the verified handle.
 		// This also rejects a parent changed to a symlink during an editor's file replacement.
@@ -141,7 +144,7 @@ async function readSource(workspaceDir: string, filename: string): Promise<strin
 			current.dev !== stat.dev ||
 			current.ino !== stat.ino
 		) {
-			throw new Error("Workflow path changed while reading; try again");
+			throw new WorkflowApiError("Workflow path changed while reading; try again", 409);
 		}
 		const buffer = Buffer.alloc(maxBytes + 1);
 		let size = 0;
@@ -150,7 +153,7 @@ async function readSource(workspaceDir: string, filename: string): Promise<strin
 			if (!result.bytesRead) break;
 			size += result.bytesRead;
 		}
-		if (size > maxBytes) throw new Error("Workflow exceeds 256 KiB");
+		if (size > maxBytes) throw new WorkflowApiError("Workflow exceeds 256 KiB", 413);
 		return buffer.subarray(0, size).toString("utf8");
 	} finally {
 		await handle.close();
@@ -165,21 +168,22 @@ function checkDocumentBudget(document: unknown): void {
 	let bytes = 0;
 	const visit = (value: unknown, depth: number): void => {
 		if (++values > maxBytes / 4 || depth > 64) {
-			throw new Error("Workflow exceeds the supported nesting or value limit");
+			throw new WorkflowApiError("Workflow exceeds the supported nesting or value limit", 400);
 		}
 		if (value === null || typeof value === "boolean" || typeof value === "number") return;
 		if (typeof value === "string") {
 			bytes += Buffer.byteLength(value);
-			if (bytes > maxBytes) throw new Error("Expanded workflow exceeds 256 KiB");
+			if (bytes > maxBytes) throw new WorkflowApiError("Expanded workflow exceeds 256 KiB", 413);
 			return;
 		}
 		if (
 			!Array.isArray(value) &&
 			(!isRecord(value) || Object.getPrototypeOf(value) !== Object.prototype)
 		) {
-			throw new Error("Workflow fields must contain JSON-compatible values");
+			throw new WorkflowApiError("Workflow fields must contain JSON-compatible values", 400);
 		}
-		if (ancestors.has(value)) throw new Error("Workflow contains circular YAML aliases");
+		if (ancestors.has(value))
+			throw new WorkflowApiError("Workflow contains circular YAML aliases", 400);
 		ancestors.add(value);
 		for (const [key, entry] of Object.entries(value)) {
 			visit(key, depth + 1);
@@ -192,7 +196,7 @@ function checkDocumentBudget(document: unknown): void {
 	const countSteps = (value: unknown): void => {
 		if (!Array.isArray(value)) return;
 		steps += value.length;
-		if (steps > maxSteps) throw new Error("Workflow exceeds 500 steps");
+		if (steps > maxSteps) throw new WorkflowApiError("Workflow exceeds 500 steps", 400);
 		for (const step of value) {
 			if (!isRecord(step)) continue;
 			countSteps(step.steps);
@@ -202,38 +206,13 @@ function checkDocumentBudget(document: unknown): void {
 	if (isRecord(document)) countSteps(document.steps);
 }
 
-function previewValue(name: string, value: unknown): unknown {
-	if (typeof value === "string" && (name === "command" || name === "run")) {
-		return value.replaceAll("\\n", "");
-	}
-	if (Array.isArray(value)) return value.map((item) => previewValue(name, item));
-	if (isRecord(value)) {
-		return Object.fromEntries(
-			Object.entries(value).map(([key, item]) => [key, previewValue(key, item)]),
-		);
-	}
-	return value;
-}
-
-function projectStep(step: WorkflowStep): NonNullable<WorkflowDetail["steps"]>[number] {
-	return {
-		id: step.id,
-		fields: Object.entries(step)
-			.filter(([name]) => name !== "id")
-			.map(([name, value]) => {
-				const projected = previewValue(name, value);
-				if ((name === "command" || name === "run") && typeof projected === "string") {
-					return { name, value: projected, language: "bash" as const };
-				}
-				return {
-					name,
-					value: stringifyYaml(projected, { lineWidth: 0 }).replace(/^([^\n]*)\n$/, "$1"),
-				};
-			}),
-	};
-}
-
-async function readWorkflow(workspaceDir: string, filename: string): Promise<WorkflowDetail> {
+async function readDefinition(
+	workspaceDir: string,
+	filename: string,
+): Promise<{
+	workflow: WorkflowDetail;
+	document?: unknown;
+}> {
 	const workflow: WorkflowDetail = {
 		id: fileId(filename),
 		name: path.basename(filename, path.extname(filename)),
@@ -244,8 +223,9 @@ async function readWorkflow(workspaceDir: string, filename: string): Promise<Wor
 		source = await readSource(workspaceDir, filename);
 	} catch (error) {
 		if (hasCode(error, "ENOENT")) throw new WorkflowApiError("Workflow not found", 404);
-		workflow.unavailableReason = error instanceof Error ? error.message : "Unable to read workflow";
-		return workflow;
+		workflow.unavailableReason =
+			error instanceof WorkflowApiError ? error.message : "Unable to read workflow";
+		return { workflow };
 	}
 	const language = path.extname(filename).toLowerCase() === ".json" ? "json" : "yaml";
 	workflow.definition = { filename, language, text: source };
@@ -259,35 +239,30 @@ async function readWorkflow(workspaceDir: string, filename: string): Promise<Wor
 			if (typeof document.description === "string" && document.description.trim())
 				workflow.description = document.description.trim();
 		}
-		// The native loader accepts a path. A private, bounded snapshot avoids rereading
-		// a changing workspace file and keeps source, validation, and graph consistent.
-		const temporary = await mkdtemp(path.join(os.tmpdir(), "lobster-web-"));
-		try {
-			const snapshot = path.join(temporary, `workflow.${language === "json" ? "json" : "yaml"}`);
-			await writeFile(snapshot, source, { mode: 0o600 });
-			const loaded = await loadWorkflowFile(snapshot);
-			const graph = JSON.parse(
-				renderWorkflowGraph({
-					workflow: loaded,
-					format: "json",
-					args: resolveWorkflowArgs(loaded.args, {}),
-				}),
-			) as WorkflowGraph;
-			const steps = loaded.steps.map(projectStep);
-			if (Buffer.byteLength(JSON.stringify({ graph, steps })) > maxBytes)
-				throw new Error("Workflow graph exceeds 256 KiB");
-			workflow.graph = {
-				...graph,
-				nodes: graph.nodes.map((node) => {
-					const type = graphNodeTypes.find((supported) => supported === node.type);
-					if (!type) throw new Error(`Unsupported workflow node type: ${node.type}`);
-					return { ...node, type };
-				}),
-			};
-			workflow.steps = steps;
-		} finally {
-			await rm(temporary, { recursive: true, force: true });
-		}
+		return { workflow, document };
+	} catch (error) {
+		workflow.unavailableReason =
+			error instanceof Error ? error.message : "Unable to parse workflow";
+	}
+	return { workflow };
+}
+
+async function readWorkflow(workspaceDir: string, filename: string): Promise<WorkflowDetail> {
+	const { workflow, document } = await readDefinition(workspaceDir, filename);
+	if (workflow.unavailableReason || document === undefined) return workflow;
+	try {
+		const loaded = validateWorkflowDocument(document);
+		const graph = JSON.parse(
+			renderWorkflowGraph({
+				workflow: loaded,
+				format: "json",
+				args: resolveWorkflowArgs(loaded.args, {}),
+			}),
+		) as WorkflowGraph;
+		if (Buffer.byteLength(JSON.stringify({ graph, steps: loaded.steps })) > maxBytes)
+			throw new WorkflowApiError("Workflow graph exceeds 256 KiB", 413);
+		workflow.graph = graph;
+		workflow.steps = loaded.steps;
 	} catch (error) {
 		workflow.unavailableReason =
 			error instanceof Error ? error.message : "Unable to parse workflow";
@@ -313,7 +288,8 @@ async function discoverFiles(
 		await verifyDirectories(workspaceDir, path.posix.join(relative, "entry"));
 		for await (const entry of await opendir(path.join(rootDir, relative))) {
 			if (++entries > maxEntries) {
-				if (!sources) throw new Error("The workflows directory exceeds 1000 entries");
+				if (!sources)
+					throw new WorkflowApiError("The workflows directory exceeds 1000 entries", 400);
 				truncated = true;
 				return;
 			}
@@ -332,7 +308,8 @@ async function discoverFiles(
 					if (!stat.isFile() || stat.nlink !== 1 || stat.size > maxBytes) continue;
 				}
 				if (files.length === maxFiles) {
-					if (!sources) throw new Error("The workflows directory exceeds 100 workflow files");
+					if (!sources)
+						throw new WorkflowApiError("The workflows directory exceeds 100 workflow files", 400);
 					truncated = true;
 					return;
 				}
@@ -374,7 +351,9 @@ export function createWorkflowApi(workspaceDir: string) {
 			const workflows = [...builtins];
 			for (const filename of (await discoverFiles(workspaceDir)).files) {
 				try {
-					const { id, name, description, source } = await readWorkflow(workspaceDir, filename);
+					const {
+						workflow: { id, name, description, source },
+					} = await readDefinition(workspaceDir, filename);
 					workflows.push({ id, name, ...(description ? { description } : {}), source });
 				} catch (error) {
 					if (!(error instanceof WorkflowApiError && error.statusCode === 404)) throw error;

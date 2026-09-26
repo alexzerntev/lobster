@@ -1,8 +1,4 @@
-import type {
-	LobsterSourceFile,
-	LobsterWorkflowFileResult,
-	LobsterWorkflowFilesResult,
-} from "../workflow-types.js";
+import type { LobsterSourceFile } from "../workflow-types.js";
 import { syntax } from "./syntax.js";
 import type { LobsterViewContext } from "./view-context.js";
 
@@ -110,10 +106,7 @@ export function createSourceExplorer({
 		message("Loading file…");
 		editor.setAttribute("aria-busy", "true");
 		try {
-			const result = await host.request<LobsterWorkflowFileResult>("lobster.workflows.file", {
-				id: workflowId,
-				path,
-			});
+			const result = await host.workflows.file(workflowId, path);
 			if (!current(generation) || read !== readEpoch) {
 				return;
 			}
@@ -135,7 +128,7 @@ export function createSourceExplorer({
 				return;
 			}
 			message(
-				`Could not read this file. ${host.redact(error instanceof Error ? error.message : String(error))} Select a file to try again.`,
+				`Could not read this file. ${host.errorMessage(error)} Select a file to try again.`,
 				true,
 			);
 			if (focus && !element.hidden) {
@@ -217,9 +210,7 @@ export function createSourceExplorer({
 		sidebar.setAttribute("aria-busy", "true");
 		message("Loading files…");
 		try {
-			const result = await host.request<LobsterWorkflowFilesResult>("lobster.workflows.files", {
-				id: workflowId,
-			});
+			const result = await host.workflows.files(workflowId);
 			if (!current(generation)) {
 				return;
 			}
@@ -254,10 +245,7 @@ export function createSourceExplorer({
 				return;
 			}
 			tree.replaceChildren();
-			message(
-				`Could not load files. ${host.redact(error instanceof Error ? error.message : String(error))} Reopen Code to try again.`,
-				true,
-			);
+			message(`Could not load files. ${host.errorMessage(error)} Reopen Code to try again.`, true);
 		} finally {
 			if (current(generation)) {
 				loading = false;

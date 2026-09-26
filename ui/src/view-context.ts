@@ -1,3 +1,12 @@
+import type {
+	LobsterWorkflowFileResult,
+	LobsterWorkflowFilesResult,
+	LobsterWorkflowResult,
+	LobsterWorkflowsResult,
+} from "../workflow-types.js";
+
+export { WorkflowViewError, workflowErrorMessage } from "./workflow-errors.js";
+
 /** Services supplied by the embedding application; the viewer owns no server or transport. */
 export type LobsterPageTarget = { id: string; params?: Readonly<Record<string, string>> };
 export type LobsterDialogProps = {
@@ -21,10 +30,15 @@ export type LobsterViewContext = {
 				dispose: () => void;
 			};
 		};
-		request: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
+		readonly workflows: {
+			list: () => Promise<LobsterWorkflowsResult>;
+			get: (id: string) => Promise<LobsterWorkflowResult>;
+			files: (id: string) => Promise<LobsterWorkflowFilesResult>;
+			file: (id: string, path: string) => Promise<LobsterWorkflowFileResult>;
+		};
 		subscribe: (listener: () => void) => () => void;
-		onEvent: (event: string, listener: (payload: unknown) => void) => () => void;
-		redact: (text: string) => string;
+		onWorkflowsChanged: (listener: () => void) => () => void;
+		errorMessage: (error: unknown) => string;
 		navigation: {
 			pageHref: (target: LobsterPageTarget) => string;
 			openPage: (target: LobsterPageTarget) => void;

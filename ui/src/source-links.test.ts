@@ -6,6 +6,8 @@ import { SourceLinksContext, SourceText } from "./source-links.js";
 
 const files = [
 	"flows/child.lobster",
+	"flows/child$.lobster",
+	"flows/release…2026.lobster",
 	"config.json",
 	"flows/config.json",
 	"file.js",
@@ -50,6 +52,15 @@ describe("node file references", () => {
 		).toBe("flows/child.lobster");
 		expect(preview("../../child.lobster", "workflow").querySelector("button")).toBeNull();
 	});
+
+	it.each(["child$.lobster", "release…2026.lobster"])(
+		"links a literal workflow filename without inferring runtime or redaction syntax: %s",
+		(filename) => {
+			expect(preview(filename, "workflow").querySelector("button")?.dataset.sourcePath).toBe(
+				`flows/${filename}`,
+			);
+		},
+	);
 
 	it("bounds highlighted links while preserving the complete code and safe file names", async () => {
 		vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

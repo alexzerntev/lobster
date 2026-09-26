@@ -1,6 +1,6 @@
 import "@lobster/ui/theme.css";
 import { mountWorkflows, mountWorkflow, type LobsterViewContext } from "@lobster/ui";
-import { createDevelopmentHost } from "./preview-host.js";
+import { createDevelopmentHost, readPreview } from "./preview-host.js";
 import "./shell.css";
 
 const app = document.querySelector<HTMLElement>("#app")!;
@@ -13,13 +13,6 @@ let events: EventSource | undefined;
 let reconnect: ReturnType<typeof setTimeout> | undefined;
 let retryDelay = 500;
 let disposed = false;
-
-async function readPreview(url: string, signal: AbortSignal) {
-	const response = await fetch(url, { signal, credentials: "omit" });
-	const body = await response.json();
-	if (!response.ok) throw new Error(body.error ?? `Request failed (${response.status})`);
-	return body;
-}
 
 const preview = createDevelopmentHost({
 	transport: {

@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
-import { parse, stringify } from "yaml";
+import { Ajv } from "ajv";
+import { stringify } from "yaml";
 import { resolveWorkflowArgs } from "../../src/workflows/file.js";
 import { renderWorkflowGraph } from "../../src/workflows/graph.js";
 import { graphNodeTypes } from "../../src/workflows/graph-types.js";
@@ -184,9 +185,8 @@ test("native graph topology and defaults are preserved without executing command
 		workflow.steps?.map((step) => step.id),
 		native.nodes.map((node: { id: string }) => node.id),
 	);
-	assert.deepEqual(workflow.steps?.[0].fields, [
-		{ name: "run", value: "printf '${message}'", language: "bash" },
-	]);
+	assert.deepEqual(workflow.steps, loaded.steps);
+	assert.equal(workflow.steps?.[0].run, "printf '${message}\\n'");
 	assert.equal(workflow.definition?.text, source);
 	assert.match(workflow.graph!.nodes[0].label, /hello/);
 	assert.equal(
@@ -223,32 +223,59 @@ test("native parallel nodes retain nested branch fields and approval for the vie
 		["before", "parallel", "finish"],
 	);
 	assert.equal(workflow.graph?.nodes[1]?.shape, "diamond");
-	const fields = (id: string) =>
-		Object.fromEntries(
-			workflow
-				.steps!.find((step) => step.id === id)!
-				.fields.map(({ name, value, language }) => [
-					name,
-					language === "bash" ? value : parse(value),
-				]),
-		);
-	assert.deepEqual(fields("parallel"), {
-		parallel: {
-			wait: "any",
-			timeout_ms: 1000,
-			branches: [
-				{ id: "shell", command: "printf 'value'", env: { EXAMPLE: "value" } },
-				{ id: "pipe", pipeline: "json", stdin: "$before.stdout" },
-			],
+	assert.deepEqual(
+		workflow.steps!.find((step) => step.id === "parallel"),
+		{
+			id: "parallel",
+			parallel: {
+				wait: "any",
+				timeout_ms: 1000,
+				branches: [
+					{ id: "shell", command: "printf 'value\\n'", env: { EXAMPLE: "value" } },
+					{ id: "pipe", pipeline: "json", stdin: "$before.stdout" },
+				],
+			},
+			approval: { prompt: "Continue after branches?" },
 		},
-		approval: { prompt: "Continue after branches?" },
-	});
+	);
 	assert.ok(
 		workflow.graph!.edges.some(
 			(edge) => edge.from === "parallel" && edge.to === "finish" && edge.label === "stdin",
 		),
 	);
 	assert.equal(workflow.definition?.text, source);
+});
+
+test("catalog reads metadata without compiling input schemas", async (t) => {
+	const { workspace, api } = await fixture(t);
+	const compile = t.mock.method(Ajv.prototype, "compile");
+	await writeFile(
+		path.join(workspace, "workflows", "input.json"),
+		JSON.stringify({
+			name: "Collect details",
+			description: "Metadata requires no graph or schema validation",
+			steps: [
+				{
+					id: "collect",
+					input: { prompt: "Details?", responseSchema: { const: "metadata-only" } },
+				},
+			],
+		}),
+	);
+	const { workflows } = await api.list();
+	assert.deepEqual(
+		workflows.find((workflow) => workflow.id === fileId("input.json")),
+		{
+			id: fileId("input.json"),
+			name: "Collect details",
+			description: "Metadata requires no graph or schema validation",
+			source: "file",
+		},
+	);
+	assert.equal(compile.mock.callCount(), 0);
+	const { workflow } = await api.get(fileId("input.json"));
+	assert.ok(workflow.graph);
+	assert.equal(compile.mock.callCount(), 1);
 });
 
 test("built-ins expose their implementation source and no invented step graph", async (t) => {
@@ -391,13 +418,19 @@ test("catalog bounds file and directory entry counts", async (t) => {
 			writeFile(path.join(directory, `${i}.yaml`), "steps: []"),
 		),
 	);
-	await assert.rejects(api.list(), /100 workflow files/);
+	await assert.rejects(
+		api.list(),
+		(error) => error instanceof WorkflowApiError && /100 workflow files/.test(error.message),
+	);
 	await rm(directory, { recursive: true });
 	await mkdir(directory);
 	await Promise.all(
 		Array.from({ length: 1001 }, (_, i) => writeFile(path.join(directory, `${i}.txt`), "")),
 	);
-	await assert.rejects(api.list(), /1000 entries/);
+	await assert.rejects(
+		api.list(),
+		(error) => error instanceof WorkflowApiError && /1000 entries/.test(error.message),
+	);
 });
 
 test("source explorer lists workflow and companion sources without parsing or executing them", async (t) => {

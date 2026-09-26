@@ -38,10 +38,12 @@ and `?host=offline` for the disconnected state.
   `graph-projection.ts` expands branches and loop bodies for display only;
   `graph-layout.ts` handles placement with Dagre. Code shows the original source.
 - `ui/workflow-types.ts` and `ui/src/view-context.ts`: read-only data and host
-  contracts. Graph types come from `src/workflows/graph-types.ts`; native Mermaid,
+  contracts with typed list, workflow, and source reads. Workflow fields stay
+  structured until the UI formats them. Graph types come from `src/workflows/graph-types.ts`; native Mermaid,
   DOT, ASCII, and JSON topology and workflow execution remain engine-owned.
 - `ui/theme/`: shared tokens, controls, fonts, and artwork; preserve `NOTICE.md`.
 - `dev/web/server.ts` and `dev-api.ts`: bounded file reads and filesystem events.
+  Listing reads metadata; opening a workflow invokes the engine's validator and graph renderer.
   `preview-host.ts`, `dialog.ts`, and `main.ts` own local navigation and lifecycle.
 - `dev/web/workspace/workflows/`: checked-in synthetic examples shared with API
   tests. Startup reads them; shutdown leaves them in place.

@@ -1,4 +1,5 @@
 import type { WorkflowGraph } from "../src/workflows/graph-types.js";
+import type { WorkflowStep } from "../src/workflows/types.js";
 
 export type LobsterWorkflowSummary = {
 	id: string;
@@ -7,10 +8,7 @@ export type LobsterWorkflowSummary = {
 	source: "file" | "builtin";
 };
 
-export type LobsterWorkflowStep = {
-	id: string;
-	fields: Array<{ name: string; value: string; language?: "bash" }>;
-};
+export type LobsterWorkflowStep = WorkflowStep;
 
 export type LobsterWorkflowDetail = LobsterWorkflowSummary & {
 	graph?: WorkflowGraph;
