@@ -9,6 +9,7 @@ import type {
 } from "../workflow-types.js";
 import { createViewFixture, mockSource } from "./index.test-support.js";
 import { WorkflowViewError } from "./workflow-errors.js";
+import { syntax } from "./syntax.js";
 
 describe("Lobster workflow page", () => {
 	it("loads more matching workflows and preserves the visible limit across file changes", async () => {
@@ -841,6 +842,71 @@ describe("Lobster workflow page", () => {
 			await act(async () => fixture.abort.abort());
 		},
 	);
+
+	it("keeps Code accessible after a graph renderer fails and recovers on a file change", async () => {
+		vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+		vi.stubGlobal(
+			"ResizeObserver",
+			class {
+				observe() {}
+				unobserve() {}
+				disconnect() {}
+			},
+		);
+		const fixture = await createViewFixture("workflow", "file:example");
+		const text = "steps:\n  - id: hello\n    command: echo hello\n";
+		fixture.get.mockResolvedValue({
+			workflow: {
+				id: "file:example",
+				name: "Example",
+				source: "file",
+				steps: [{ id: "hello", command: "echo hello" }],
+				graph: {
+					nodes: [{ id: "hello", type: "run", label: "hello", shape: "box" }],
+					edges: [],
+				},
+			},
+		});
+		mockSource(fixture, "example.yaml", text, "yaml");
+		const highlight = syntax.highlightElement.bind(syntax);
+		const failure = new Error("private-render-detail");
+		const highlighting = vi.spyOn(syntax, "highlightElement").mockImplementation((element) => {
+			if (element.classList.contains("language-bash")) throw failure;
+			highlight(element);
+		});
+		const reported = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			await act(async () => fixture.mount());
+			const alert = fixture.container.querySelector('[role="alert"]');
+			expect(alert?.textContent).toContain("Could not render flow");
+			expect(alert?.textContent).toContain("Select Code");
+			expect(fixture.container.textContent).not.toContain(failure.message);
+			const buttons = Array.from(fixture.container.querySelectorAll("button"));
+			const flow = buttons.find((button) => button.textContent === "Flow")!;
+			const code = buttons.find((button) => button.textContent === "Code")!;
+			expect(flow.disabled).toBe(true);
+			expect(code.disabled).toBe(false);
+			await act(async () => code.click());
+			expect(fixture.container.querySelector("pre")?.textContent).toBe(text);
+			expect(fixture.container.querySelector("pre .hljs-attr")).not.toBeNull();
+
+			highlighting.mockRestore();
+			mockSource(fixture, "example.yaml", text, "yaml");
+			await act(async () => fixture.changed());
+			expect(fixture.container.querySelector('[role="alert"]')).toBeNull();
+			expect(flow.disabled).toBe(false);
+			expect(code.getAttribute("aria-pressed")).toBe("true");
+			await act(async () => flow.click());
+			expect(fixture.container.querySelector(".react-flow__node")?.textContent).toContain("hello");
+			expect(fixture.container.querySelector(".react-flow__node .hljs-built_in")).not.toBeNull();
+			await act(async () => fixture.abort.abort());
+			expect(fixture.events.size).toBe(0);
+			expect(fixture.container.childElementCount).toBe(0);
+		} finally {
+			highlighting.mockRestore();
+			reported.mockRestore();
+		}
+	});
 
 	it("handles code-only and rejected graphs and recovers when a valid graph loads", async () => {
 		vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

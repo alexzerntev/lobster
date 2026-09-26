@@ -53,6 +53,8 @@ viewer label map, and examples together. Existing tests discover the fixtures
 and exercise the real loader, graph output, source reads, child links, and viewer
 projection without executing commands. Keep invalid cases in temporary test
 fixtures. Run `check` and inspect affected UI states; jsdom cannot verify layout.
+Unexpected graph-rendering failures leave Code and navigation available; a file
+change retries the graph without reloading the page.
 
 The preview implements inspection/navigation only; unsupported host operations
 fail explicitly. Preserve stale-request protection and dispose subscriptions,

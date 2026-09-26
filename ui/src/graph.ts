@@ -15,6 +15,7 @@ import {
 	type NodeProps,
 } from "@xyflow/react";
 import {
+	Component,
 	Fragment,
 	createContext,
 	createElement as h,
@@ -25,6 +26,7 @@ import {
 	useLayoutEffect,
 	useRef,
 	useState,
+	type ReactNode,
 } from "react";
 import { createRoot } from "react-dom/client";
 import type { LobsterSourceFile, LobsterWorkflowDetail } from "../workflow-types.js";
@@ -161,6 +163,27 @@ function WorkflowConnection({ id, markerEnd, label, data }: EdgeProps<WorkflowEd
 	);
 }
 const edgeTypes = { "lobster-native": WorkflowConnection };
+
+// Graph dependencies may fail during React's commit phase, outside load()'s
+// try/catch. Keep the source explorer and navigation outside this boundary.
+class WorkflowRenderBoundary extends Component<
+	{ children: ReactNode; onError: () => void },
+	{ failed: boolean }
+> {
+	state = { failed: false };
+
+	static getDerivedStateFromError() {
+		return { failed: true };
+	}
+
+	componentDidCatch() {
+		this.props.onError();
+	}
+
+	render() {
+		return this.state.failed ? null : this.props.children;
+	}
+}
 
 function WorkflowFlow({
 	graph,
@@ -493,25 +516,35 @@ function createWorkflowView(
 	};
 
 	const render = () => {
+		const current = generation;
 		root.render(
 			graph
-				? h(ReactFlowProvider, {
+				? h(WorkflowRenderBoundary, {
 						key: `${workflowId}:${generation}`,
-						children: h(SubworkflowContext.Provider, {
-							value: openChild,
-							children: h(SourceLinksContext.Provider, {
-								value: {
-									files: sourceFiles,
-									filename: workflow?.definition?.filename,
-									open: (path) => {
-										if (source.open(path)) {
-											selectedView = true;
-											viewMode = "code";
-											showView();
-										}
+						onError() {
+							if (disposed || signal.aborted || current !== generation) return;
+							graph = undefined;
+							flowError =
+								"Could not render flow. Select Code to inspect the definition, or edit the workflow to try again.";
+							showView();
+						},
+						children: h(ReactFlowProvider, {
+							children: h(SubworkflowContext.Provider, {
+								value: openChild,
+								children: h(SourceLinksContext.Provider, {
+									value: {
+										files: sourceFiles,
+										filename: workflow?.definition?.filename,
+										open: (path) => {
+											if (source.open(path)) {
+												selectedView = true;
+												viewMode = "code";
+												showView();
+											}
+										},
 									},
-								},
-								children: h(WorkflowFlow, { graph, colorMode }),
+									children: h(WorkflowFlow, { graph, colorMode }),
+								}),
 							}),
 						}),
 					})
