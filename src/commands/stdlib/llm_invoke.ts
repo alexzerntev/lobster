@@ -3,8 +3,7 @@ import type { LlmChargeCost, LlmSpendLedger, LlmProvenance } from "../../core/ll
 import path from "node:path";
 import { promises as fsp } from "node:fs";
 import { createHash } from "node:crypto";
-import { Ajv } from "ajv";
-import type { ErrorObject } from "ajv";
+import { Ajv, type ErrorObject } from "ajv";
 
 import {
 	diffAndStore,
@@ -20,8 +19,10 @@ import { createCompileCached } from "../../validation.js";
 import type { LobsterCommand } from "../types.js";
 import { httpResponseLimitFromEnv, readResponseTextCapped } from "../../read_response_text.js";
 
-const ajv = new Ajv({ allErrors: true, strict: false });
-const compileCachedLocal = createCompileCached(ajv);
+const validationOptions = { allErrors: true, strict: false };
+// Fixed envelopes stay compiled; user schemas belong to the bounded compiler.
+const ajv = new Ajv(validationOptions);
+const compileCachedLocal = createCompileCached(validationOptions);
 
 const artifactSchema = {
 	type: "object",
