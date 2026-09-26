@@ -104,7 +104,7 @@ const server = await createServer({
 	],
 });
 
-const workflowWatch = watchWorkflows(
+const workflowWatch = await watchWorkflows(
 	workspace,
 	() => {
 		for (const client of clients) client.write("event: workflows-changed\ndata: {}\n\n");

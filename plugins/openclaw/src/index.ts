@@ -25,16 +25,21 @@ export default definePluginEntry({
 					new URL("./github_pr_monitor.ts", import.meta.url),
 				);
 				current = inspection;
-				const watcher = watchWorkflows(context.workspaceDir, emit, (error) => {
-					context.logger.error(`Lobster workflow watcher failed: ${String(error)}`);
-					context.serviceHealth?.reportFailure(error);
-				});
-				stopWatching = watcher.close;
+				let watcher: Awaited<ReturnType<typeof watchWorkflows>> | undefined;
 				try {
+					watcher = await watchWorkflows(context.workspaceDir, emit, (error) => {
+						context.logger.error(`Lobster workflow watcher failed: ${String(error)}`);
+						context.serviceHealth?.reportFailure(error);
+					});
+					if (current !== inspection) {
+						await watcher.close();
+						return;
+					}
+					stopWatching = watcher.close;
 					await watcher.ready;
 				} catch (error) {
 					if (current === inspection) current = undefined;
-					await watcher.close();
+					await watcher?.close();
 					throw error;
 				}
 				if (current === inspection) emit();

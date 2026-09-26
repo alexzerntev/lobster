@@ -1,28 +1,36 @@
 import path from "node:path";
+import { realpath, stat } from "node:fs/promises";
 import { watch } from "chokidar";
 
 /** One watcher per host lifetime, including creation/removal of the workflows directory. */
-export function watchWorkflows(
+export async function watchWorkflows(
 	workspace: string,
 	changed: () => void,
 	failed: (error: unknown) => void,
 ) {
+	let root: string;
+	try {
+		root = await realpath(workspace);
+		if (!(await stat(root)).isDirectory()) throw new Error("Not a directory");
+	} catch {
+		throw new Error("Lobster viewer requires an existing, readable workspace directory.");
+	}
 	let stopped = false;
 	let pending: ReturnType<typeof setTimeout> | undefined;
-	const root = path.join(workspace, "workflows");
+	// Start from the existing parent: Chokidar can signal ready before installing
+	// its fallback watcher for a missing path. This also survives workflows/ replacement.
 	const watcher = watch(root, {
 		ignoreInitial: true,
 		followSymlinks: false,
-		depth: 8,
+		depth: 9,
 		ignored: (filename) => {
 			const relative = path.relative(root, filename);
-			// Chokidar visits parents when the target does not exist yet. Do not ignore
-			// those ancestors: they are how a later workflows/ creation is discovered.
-			if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
-				return false;
-			return relative
-				.split(path.sep)
-				.some((part) => part.startsWith(".") || part === "node_modules");
+			if (!relative) return false;
+			const parts = relative.split(path.sep);
+			return (
+				parts[0] !== "workflows" ||
+				parts.some((part) => part.startsWith(".") || part === "node_modules")
+			);
 		},
 	});
 	let settled = false;
