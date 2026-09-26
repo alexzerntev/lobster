@@ -78,6 +78,8 @@ conventional interrupt exit status.
 - `exec --stdin raw|json|jsonl`: feed pipeline input into subprocess stdin
 - Explicit quoted empty arguments are retained by both pipeline `exec` and SDK `exec`. Invocation shims preserve argument punctuation without shell expansion.
 - `where`, `pick`, `head`: data shaping
+- `head --n N` stops reading upstream as soon as N items have been yielded; `--n 0` does not read upstream input.
+- `pick` and `map` preserve field names such as `__proto__` as ordinary own data fields.
 - `json`, `table`: renderers
 - `approve`: approval gate (TTY prompt or `--emit` for OpenClaw integration)
 
@@ -225,6 +227,8 @@ Built-in providers today:
 - `openclaw` via `OPENCLAW_URL` / `OPENCLAW_TOKEN`
 - `pi` via `LOBSTER_PI_LLM_ADAPTER_URL` (typically supplied by the Pi extension)
 - `http` via `LOBSTER_LLM_ADAPTER_URL`
+
+The OpenClaw adapter calls the gateway's `llm-task` tool: artifacts become `input`, and `--max-output-tokens` becomes `maxTokens`. It reads JSON from the tool's `details.json` result. `--output-schema` is included in the model prompt and validated locally so `--max-validation-retries` still controls retries, including validation feedback. Gateway failures are surfaced without a validation retry. The tool currently does not return token usage, so this adapter cannot estimate spend or enforce token-based cost limits for these calls.
 
 A host embedding Lobster can supply its own adapters through `ctx.llmAdapters`. Step `timeout_ms` and workflow cancellation reach an adapter as `ctx.signal`: Lobster stops waiting as soon as that signal aborts, so the step fails or retries on time either way, but it cannot cancel work an adapter has already started. An injected adapter should observe `ctx.signal` and abort its own request — otherwise a timed-out step can leave a model call running, and billed, in the background.
 
