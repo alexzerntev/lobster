@@ -74,3 +74,18 @@ jobs:
       - name: Check live viewer themes
         if: matrix.node == 24
         run: pnpm test:web:browser
+
+      - name: Install optional OpenClaw authoring dependencies
+        if: matrix.node == 24
+        working-directory: plugins/openclaw
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and check installable viewer plugin
+        if: matrix.node == 24
+        working-directory: plugins/openclaw
+        run: |
+          pnpm build
+          pnpm typecheck
+          pnpm lint
+          pnpm test
+          pnpm pack --out "$RUNNER_TEMP/lobster-viewer.tgz"

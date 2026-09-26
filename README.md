@@ -356,7 +356,8 @@ workflow dialogs, and highlighted source with a file tree. Start it with
 `pnpm dev:web`; see [UI development](dev/web/README.md) for prerequisites and
 maintenance. The local server reloads source edits and watches workflow files automatically.
 No OpenClaw installation is needed; the viewer/server are excluded from the
-published runtime.
+published runtime. For installation inside OpenClaw, build the separate
+[viewer plugin](plugins/openclaw/README.md) from this repository.
 
 The runtime is one TypeScript package; `ui` owns the private workflow viewer and `dev/web` owns its development-only server. `src/core` contains the embeddable tool API, cost tracking, and LLM accounting; `src/sdk` provides pipeline composition; `src/commands` holds the command registry and standard library. Workflow loading, expressions, dry-run rendering, and execution live under `src/workflows`. `src/state` owns atomic file persistence, locks, and resume capabilities. GitHub SDK recipes and built-in workflows share transport and snapshot helpers.
 

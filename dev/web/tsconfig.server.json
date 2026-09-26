@@ -3,5 +3,5 @@
 	"compilerOptions": {
 		"noEmit": true
 	},
-	"include": ["server.ts", "dev-api.ts", "dev-api.test.ts"]
+	"include": ["server.ts", "dev-api.test.ts"]
 }

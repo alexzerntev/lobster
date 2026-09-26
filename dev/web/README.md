@@ -68,9 +68,12 @@ checks. The standalone palette copy is not automatically synchronized upstream.
   structured until the UI formats them. Graph types come from `src/workflows/graph-types.ts`; native Mermaid,
   DOT, ASCII, and JSON topology and workflow execution remain engine-owned.
 - `ui/theme/`: shared tokens, controls, fonts, and artwork; preserve `NOTICE.md`.
-- `dev/web/server.ts` and `dev-api.ts`: bounded file reads and filesystem events.
+- `ui/server/`: shared bounded file reads and lifecycle-owned filesystem watching.
   Listing reads metadata; opening a workflow invokes the engine's validator and graph renderer.
-  `preview-host.ts`, `dialog.ts`, and `main.ts` own local navigation and lifecycle.
+- `dev/web/server.ts`: development-only HTTP/SSE transport. `preview-host.ts`,
+  `dialog.ts`, and `main.ts` own local navigation and lifecycle.
+- `plugins/openclaw/`: optional installable adapter; see its [build/install instructions](../../plugins/openclaw/README.md).
+  It bundles the same UI and inspection owner, with no development server.
 - `dev/web/workspace/workflows/`: checked-in synthetic examples shared with API
   tests. Startup reads them; shutdown leaves them in place.
 

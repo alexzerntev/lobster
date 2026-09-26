@@ -12,7 +12,7 @@ import { graphNodeTypes } from "../../src/workflows/graph-types.js";
 import { loadWorkflowFile } from "../../src/workflows/load.js";
 import { projectWorkflowGraph } from "../../ui/src/graph-projection.js";
 import { subworkflowTarget } from "../../ui/src/subworkflow-target.js";
-import { createWorkflowApi, WorkflowApiError } from "./dev-api.js";
+import { createWorkflowApi, WorkflowApiError } from "../../ui/server/workflows.js";
 
 function fileId(filename: string): string {
 	return `file:${Buffer.from(filename).toString("base64url")}`;

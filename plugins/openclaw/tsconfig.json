@@ -1,0 +1,7 @@
+{
+	"extends": "../../ui/tsconfig.json",
+	"include": ["src/control-ui.ts", "src/contract.ts", "../../ui/src/assets.d.ts"],
+	"compilerOptions": {
+		"strict": true
+	}
+}

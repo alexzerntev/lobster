@@ -1,0 +1,20 @@
+{
+	"id": "lobster-viewer",
+	"name": "Lobster",
+	"description": "Browse Lobster workflows, graphs, and source files without executing them.",
+	"version": "2026.9.13",
+	"activation": {
+		"onStartup": true
+	},
+	"configSchema": {
+		"type": "object",
+		"properties": {},
+		"additionalProperties": false
+	},
+	"controlUi": {
+		"entry": "dist/control-ui/fc50da53c66a242e/index.js",
+		"styles": [
+			"dist/control-ui/fc50da53c66a242e/index.css"
+		]
+	}
+}

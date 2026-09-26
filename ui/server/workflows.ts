@@ -13,11 +13,11 @@ import type {
 	LobsterSourceLanguage as SourceLanguage,
 	LobsterWorkflowFilesResult as WorkflowFilesResult,
 	LobsterWorkflowFileResult as WorkflowFileResult,
-} from "@lobster/ui/workflow-types";
+} from "../workflow-types.js";
 export type {
 	LobsterWorkflowSummary as WorkflowSummary,
 	LobsterWorkflowDetail as WorkflowDetail,
-} from "@lobster/ui/workflow-types";
+} from "../workflow-types.js";
 
 export class WorkflowApiError extends Error {
 	constructor(
@@ -322,7 +322,10 @@ async function discoverFiles(
 	return { files: files.sort(), truncated };
 }
 
-export function createWorkflowApi(workspaceDir: string) {
+export function createWorkflowApi(
+	workspaceDir: string,
+	builtinSource = new URL(`../../${builtinPath}`, import.meta.url),
+) {
 	const builtins: WorkflowSummary[] = listWorkflows().map(({ name, description }) => ({
 		id: `builtin:${name}`,
 		name,
@@ -335,7 +338,7 @@ export function createWorkflowApi(workspaceDir: string) {
 			throw new WorkflowApiError("Workflow not found", 404);
 		return builtin;
 	};
-	const readBuiltin = () => readFile(new URL(`../../${builtinPath}`, import.meta.url), "utf8");
+	const readBuiltin = () => readFile(builtinSource, "utf8");
 	const verifyWorkflow = async (id: string): Promise<string> => {
 		const filename = filenameFromId(id);
 		try {

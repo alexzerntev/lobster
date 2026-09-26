@@ -1,8 +1,9 @@
 import path from "node:path";
+import { watchWorkflows } from "../../ui/server/watch-workflows.js";
 import { fileURLToPath } from "node:url";
 import type { ServerResponse } from "node:http";
 import { createServer } from "vite";
-import { createWorkflowApi, WorkflowApiError } from "./dev-api.js";
+import { createWorkflowApi, WorkflowApiError } from "../../ui/server/workflows.js";
 
 if (process.env.NODE_ENV === "production") {
 	throw new Error("The Lobster preview server is development-only; it is not a production server.");
@@ -14,7 +15,6 @@ const workspace = path.resolve(process.env.LOBSTER_WORKSPACE ?? path.join(root, 
 const port = Number(process.env.LOBSTER_WEB_PORT ?? 5180);
 const api = createWorkflowApi(workspace);
 const clients = new Set<ServerResponse>();
-let pendingChange: ReturnType<typeof setTimeout> | undefined;
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 
 const server = await createServer({
@@ -104,18 +104,13 @@ const server = await createServer({
 	],
 });
 
-const changed = (_event: string, filename: string) => {
-	const relative = path.relative(path.join(workspace, "workflows"), filename);
-	if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
-		return;
-	clearTimeout(pendingChange);
-	pendingChange = setTimeout(() => {
-		pendingChange = undefined;
+const workflowWatch = watchWorkflows(
+	workspace,
+	() => {
 		for (const client of clients) client.write("event: workflows-changed\ndata: {}\n\n");
-	}, 100);
-};
-server.watcher.add(path.join(workspace, "workflows"));
-server.watcher.on("all", changed);
+	},
+	(error) => server.config.logger.error(`Workflow watcher failed: ${String(error)}`),
+);
 heartbeat = setInterval(() => {
 	for (const client of clients) client.write(": heartbeat\n\n");
 }, 30_000);
@@ -124,14 +119,14 @@ let closing = false;
 const close = async () => {
 	if (closing) return;
 	closing = true;
-	clearTimeout(pendingChange);
 	clearInterval(heartbeat);
-	server.watcher.off("all", changed);
+	await workflowWatch.close();
 	for (const client of clients) client.end();
 	clients.clear();
 	await server.close();
 };
 process.once("SIGTERM", () => void close());
 process.once("SIGINT", () => void close());
+await workflowWatch.ready;
 await server.listen();
 server.printUrls();

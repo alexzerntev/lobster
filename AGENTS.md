@@ -4,7 +4,7 @@ Guidance for coding assistants operating in this repository.
 
 ## Viewer Development
 
-- Keep the read-only viewer in `ui/` and the development harness in `dev/web/`; neither ships in the runtime package. Setup and checks: [dev/web/README.md](dev/web/README.md).
+- Keep the read-only viewer and shared inspection in `ui/`, the development harness in `dev/web/`, and the optional OpenClaw adapter in `plugins/openclaw/`; none ship in the CLI runtime package. Setup and checks: [dev/web/README.md](dev/web/README.md).
 - The engine owns graph node types in `src/workflows/graph-types.ts`. Update viewer handling and checked-in examples together when changing this contract.
 - Keep documentation changes concise and limited to changed features and maintenance requirements.
 
