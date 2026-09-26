@@ -2,6 +2,19 @@
 
 All notable changes to Lobster will be documented in this file.
 
+## Unreleased
+
+## 2026.9.14 - 2026-09-21
+
+**Highlights:** OpenClaw LLM pipelines use the gateway's current tool protocol, and large tables render without crashing.
+
+- Translate OpenClaw `llm-task` requests and tool results correctly in `llm.invoke` and `llm_task.invoke`, preserving local schema validation and retries; thanks @bggsolar (Issue [#185](https://github.com/openclaw/lobster/issues/185)).
+- Render large tables without overflowing the JavaScript argument limit while calculating column widths.
+- Stop `head` at its requested item limit without reading an extra upstream item, avoiding unwanted work, errors, or hangs after the requested output is complete.
+- Preserve `__proto__` fields in `pick` projections and `map` assignments without changing output object prototypes or silently dropping data.
+- Keep compiled tests out of npm packages prepared after validation, reducing download and install size while preserving runtime source maps.
+- Cover empty, object-table, and mixed-value terminal rendering; thanks @KrasimirKralev (PR [#184](https://github.com/openclaw/lobster/pull/184)).
+
 ## 2026.9.13 - 2026-09-13
 
 **Highlights:** Cost limits no longer stop workflows falsely when later steps reuse LLM results, and CLI pipelines preserve empty and quoted arguments.

@@ -4,7 +4,7 @@ packages:
   - "ui"
 
 overrides:
-  fast-uri: 4.1.4
+  fast-uri: 4.2.1
 
 minimumReleaseAge: 2880
 

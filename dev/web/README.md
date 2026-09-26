@@ -7,7 +7,7 @@ local engine without executing workflows or requiring OpenClaw or credentials.
 
 ## Development
 
-Requires Node 22.22.2+ (22.x) or 24.15+ (24.x), pnpm 12.4.1 (pinned in
+Requires Node 22.22.2+ (22.x) or 24.15+ (24.x), pnpm 12.5.1 (pinned in
 `package.json`), and port 5180 available. Run from the repository root:
 
 ```sh
