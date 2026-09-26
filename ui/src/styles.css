@@ -196,6 +196,7 @@
 }
 
 .lobster-graph__heading .page-title {
+	margin: 0;
 	font-size: var(--control-ui-text-lg);
 }
 
