@@ -1,16 +1,15 @@
+import { WorkflowViewError, workflowErrorMessage } from "../../ui/src/workflow-errors.js";
 import {
-	WorkflowViewError,
-	workflowErrorMessage,
 	type LobsterPageTarget,
 	type LobsterHostTheme,
 	type LobsterViewContext,
-} from "@lobster/ui/view-context";
+} from "@clawdbot/lobster-viewer";
 import type {
 	LobsterWorkflowFileResult,
 	LobsterWorkflowFilesResult,
 	LobsterWorkflowResult,
 	LobsterWorkflowsResult,
-} from "@lobster/ui/workflow-types";
+} from "@clawdbot/lobster-viewer";
 import { mountDevelopmentDialog } from "./dialog.js";
 
 type WorkflowTransport = {

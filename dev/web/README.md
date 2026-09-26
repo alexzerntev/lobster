@@ -72,8 +72,8 @@ checks. The standalone palette copy is not automatically synchronized upstream.
   Listing reads metadata; opening a workflow invokes the engine's validator and graph renderer.
 - `dev/web/server.ts`: development-only HTTP/SSE transport. `preview-host.ts`,
   `dialog.ts`, and `main.ts` own local navigation and lifecycle.
-- `plugins/openclaw/`: optional installable adapter; see its [build/install instructions](../../plugins/openclaw/README.md).
-  It bundles the same UI and inspection owner, with no development server.
+- OpenClaw’s `extensions/lobster/` owns plugin registration and its host adapter.
+  It consumes the [viewer library](../../ui/README.md), with no development server.
 - `dev/web/workspace/workflows/`: checked-in synthetic examples shared with API
   tests. Startup reads them; shutdown leaves them in place.
 
@@ -89,8 +89,8 @@ change retries the graph without reloading the page.
 The preview implements inspection/navigation only; unsupported host operations
 fail explicitly. Preserve stale-request protection and dispose subscriptions,
 requests, timers, dialogs, and views when replaced. One filesystem watcher serves
-one event stream per browser shell. `ui` and `dev/web` stay private and excluded
-from the runtime tarball; the server rejects `NODE_ENV=production`.
+one event stream per browser shell. The viewer library is packaged separately; `dev/web` stays private. Both are excluded
+from the engine runtime tarball; the server rejects `NODE_ENV=production`.
 
 ## File boundaries
 

@@ -1,7 +1,7 @@
-import type { LobsterPageTarget, LobsterHostTheme } from "@lobster/ui/view-context";
+import type { LobsterPageTarget, LobsterHostTheme } from "@clawdbot/lobster-viewer";
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { LobsterWorkflowFileResult } from "@lobster/ui/workflow-types";
+import type { LobsterWorkflowFileResult } from "@clawdbot/lobster-viewer";
 import { createDevelopmentHost, readPreview } from "./preview-host.js";
 
 function fixture(theme: LobsterHostTheme = { colorMode: "light", subscribe: () => () => {} }) {

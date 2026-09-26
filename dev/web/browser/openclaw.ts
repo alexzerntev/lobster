@@ -1,4 +1,4 @@
-import { mountWorkflow, observeHostTheme } from "@lobster/ui";
+import { mountWorkflow, observeHostTheme } from "@clawdbot/lobster-viewer";
 import { createThemeDriver } from "virtual:lobster-theme-driver";
 import { createDevelopmentHost, readPreview } from "../preview-host.js";
 import "../shell.css";

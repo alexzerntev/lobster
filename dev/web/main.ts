@@ -1,10 +1,10 @@
-import "@lobster/ui/theme.css";
+import "../../ui/theme/theme.css";
 import {
 	mountWorkflows,
 	mountWorkflow,
 	observeHostTheme,
 	type LobsterViewContext,
-} from "@lobster/ui";
+} from "@clawdbot/lobster-viewer";
 import { createDevelopmentHost, readPreview } from "./preview-host.js";
 import "./shell.css";
 

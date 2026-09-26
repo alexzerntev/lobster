@@ -1,4 +1,4 @@
-import type { LobsterViewContext } from "@lobster/ui/view-context";
+import type { LobsterViewContext } from "@clawdbot/lobster-viewer";
 
 type MountDialog = LobsterViewContext["host"]["components"]["mountDialog"];
 type DialogProps = Parameters<MountDialog>[1];

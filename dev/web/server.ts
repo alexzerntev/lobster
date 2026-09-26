@@ -27,6 +27,7 @@ const server = await createServer({
 	optimizeDeps: { entries: ["index.html"] },
 	resolve: {
 		dedupe: ["react", "react-dom"],
+		alias: { "@clawdbot/lobster-viewer": path.join(uiRoot, "src/index.ts") },
 	},
 	server: {
 		host: process.env.LOBSTER_WEB_HOST ?? "127.0.0.1",

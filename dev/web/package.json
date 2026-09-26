@@ -11,7 +11,7 @@
 		"test:theme:openclaw": "playwright test --project openclaw"
 	},
 	"devDependencies": {
-		"@lobster/ui": "workspace:*",
+		"@clawdbot/lobster-viewer": "workspace:*",
 		"@playwright/test": "1.63.0",
 		"tsx": "4.23.13",
 		"vite": "8.3.0",
