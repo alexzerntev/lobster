@@ -1,5 +1,10 @@
 import "@lobster/ui/theme.css";
-import { mountWorkflows, mountWorkflow, type LobsterViewContext } from "@lobster/ui";
+import {
+	mountWorkflows,
+	mountWorkflow,
+	observeHostTheme,
+	type LobsterViewContext,
+} from "@lobster/ui";
 import { createDevelopmentHost, readPreview } from "./preview-host.js";
 import "./shell.css";
 
@@ -14,7 +19,19 @@ let reconnect: ReturnType<typeof setTimeout> | undefined;
 let retryDelay = 500;
 let disposed = false;
 
+const appearance = new AbortController();
+const theme = options.get("theme");
+const systemTheme = matchMedia("(prefers-color-scheme: dark)");
+const syncTheme = () => {
+	const mode =
+		theme === "light" || theme === "dark" ? theme : systemTheme.matches ? "dark" : "light";
+	document.documentElement.dataset.themeMode = mode;
+	document.documentElement.dataset.theme = mode;
+};
+systemTheme.addEventListener("change", syncTheme);
+syncTheme();
 const preview = createDevelopmentHost({
+	theme: observeHostTheme(document.documentElement, appearance.signal),
 	transport: {
 		list: (signal) => readPreview("/api/workflows", signal),
 		get: (id, signal) => readPreview(`/api/workflow?id=${encodeURIComponent(id)}`, signal),
@@ -82,23 +99,12 @@ const connectEvents = () => {
 connectEvents();
 window.addEventListener("popstate", render);
 
-// Host appearance can be exercised without adding controls to the embedded view.
-const theme = options.get("theme");
-const systemTheme = matchMedia("(prefers-color-scheme: dark)");
-const syncTheme = () => {
-	const mode =
-		theme === "light" || theme === "dark" ? theme : systemTheme.matches ? "dark" : "light";
-	document.documentElement.dataset.themeMode = mode;
-	document.documentElement.dataset.theme = mode;
-	preview.notify();
-};
-systemTheme.addEventListener("change", syncTheme);
-syncTheme();
 render();
 
 // Replacement owns one event stream and no listeners from an earlier mount.
 import.meta.hot?.dispose(() => {
 	disposed = true;
+	appearance.abort();
 	clearTimeout(reconnect);
 	reconnect = undefined;
 	lifetime?.abort();

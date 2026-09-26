@@ -6,10 +6,13 @@
 		"dev": "tsx watch --clear-screen=false server.ts",
 		"test": "tsx --test *.test.ts",
 		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-		"lint": "oxlint --config .oxlintrc.json --tsconfig tsconfig.json ."
+		"lint": "oxlint --config .oxlintrc.json --tsconfig tsconfig.json .",
+		"test:browser": "playwright test --project standalone",
+		"test:theme:openclaw": "playwright test --project openclaw"
 	},
 	"devDependencies": {
 		"@lobster/ui": "workspace:*",
+		"@playwright/test": "1.63.0",
 		"tsx": "4.23.13",
 		"vite": "8.3.0",
 		"yaml": "2.9.0"

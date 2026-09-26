@@ -9,6 +9,11 @@ export { WorkflowViewError, workflowErrorMessage } from "./workflow-errors.js";
 
 /** Services supplied by the embedding application; the viewer owns no server or transport. */
 export type LobsterPageTarget = { id: string; params?: Readonly<Record<string, string>> };
+/** Resolved appearance of the embedding surface; the host also supplies its CSS tokens. */
+export type LobsterHostTheme = {
+	readonly colorMode: "light" | "dark";
+	subscribe: (listener: () => void) => () => void;
+};
 export type LobsterDialogProps = {
 	label: string;
 	style?: string;
@@ -18,6 +23,7 @@ export type LobsterDialogProps = {
 };
 export type LobsterViewContext = {
 	readonly host: {
+		readonly theme: LobsterHostTheme;
 		readonly connection: { readonly connected: boolean };
 		readonly components: {
 			mountDialog: (

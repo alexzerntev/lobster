@@ -1,10 +1,10 @@
-import type { LobsterPageTarget } from "@lobster/ui/view-context";
+import type { LobsterPageTarget, LobsterHostTheme } from "@lobster/ui/view-context";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { LobsterWorkflowFileResult } from "@lobster/ui/workflow-types";
 import { createDevelopmentHost, readPreview } from "./preview-host.js";
 
-function fixture() {
+function fixture(theme: LobsterHostTheme = { colorMode: "light", subscribe: () => () => {} }) {
 	const requests: Array<{
 		method: "list" | "get" | "files" | "file";
 		signal: AbortSignal;
@@ -13,6 +13,7 @@ function fixture() {
 	}> = [];
 	const navigations: string[] = [];
 	const owner = createDevelopmentHost({
+		theme,
 		transport: {
 			async list(signal) {
 				requests.push({ method: "list", signal });
@@ -41,6 +42,36 @@ function fixture() {
 	const view = owner.createView(lifetime.signal);
 	return { owner, lifetime, view, requests, navigations };
 }
+
+test("theme subscriptions are retired exactly once across view abort and consumer disposal", () => {
+	const listeners = new Set<() => void>();
+	let colorMode: "light" | "dark" = "light";
+	let releases = 0;
+	const f = fixture({
+		get colorMode() {
+			return colorMode;
+		},
+		subscribe(listener) {
+			listeners.add(listener);
+			return () => {
+				releases++;
+				listeners.delete(listener);
+			};
+		},
+	});
+	const modes: string[] = [];
+	const stop = f.view.host.theme.subscribe(() => modes.push(f.view.host.theme.colorMode));
+	colorMode = "dark";
+	for (const listener of listeners) listener();
+	assert.deepEqual(modes, ["dark"]);
+	f.lifetime.abort();
+	stop();
+	stop();
+	f.owner.dispose();
+	assert.equal(releases, 1);
+	assert.equal(listeners.size, 0);
+	assert.throws(() => f.view.host.theme.subscribe(() => {}), { name: "AbortError" });
+});
 
 test("the adapter starts disconnected and forwards typed workflow reads", async () => {
 	const { owner, view, requests } = fixture();
@@ -150,6 +181,7 @@ test("navigation aborts pending source reads and rejects late results, even if t
 	let complete!: (result: LobsterWorkflowFileResult) => void;
 	let transportSignal: AbortSignal | undefined;
 	const owner = createDevelopmentHost({
+		theme: { colorMode: "light", subscribe: () => () => {} },
 		transport: {
 			file(_id, _path, signal) {
 				transportSignal = signal;

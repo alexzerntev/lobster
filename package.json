@@ -57,7 +57,9 @@
 		"crabbox:stop": "crabbox stop",
 		"crabbox:warmup": "crabbox warmup",
 		"dev:web": "pnpm --filter @lobster/dev-web dev",
-		"test:web": "pnpm --filter @lobster/dev-web test && pnpm --filter @lobster/ui test"
+		"test:web": "pnpm --filter @lobster/dev-web test && pnpm --filter @lobster/ui test",
+		"test:web:browser": "pnpm --filter @lobster/dev-web test:browser",
+		"test:theme:openclaw": "pnpm --filter @lobster/dev-web test:theme:openclaw"
 	},
 	"dependencies": {
 		"ajv": "^8.20.0",

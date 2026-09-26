@@ -2,6 +2,7 @@ import {
 	WorkflowViewError,
 	workflowErrorMessage,
 	type LobsterPageTarget,
+	type LobsterHostTheme,
 	type LobsterViewContext,
 } from "@lobster/ui/view-context";
 import type {
@@ -71,9 +72,11 @@ export async function readPreview(url: string, signal: AbortSignal) {
 export function createDevelopmentHost({
 	transport,
 	navigate,
+	theme,
 }: {
 	transport: WorkflowTransport;
 	navigate: (href: string) => void;
+	theme: LobsterHostTheme;
 }) {
 	let connected = false;
 	const owner = new AbortController();
@@ -95,6 +98,7 @@ export function createDevelopmentHost({
 			const lifetime = new AbortController();
 			const listeners = new Set<() => void>();
 			const events = new Set<() => void>();
+			const themeSubscriptions = new Set<() => void>();
 			const assertActive = () => lifetime.signal.throwIfAborted();
 			const read = async <T>(operation: () => Promise<T>): Promise<T> => {
 				assertActive();
@@ -109,6 +113,8 @@ export function createDevelopmentHost({
 			const dispose = () => {
 				if (lifetime.signal.aborted) return;
 				lifetime.abort();
+				for (const stop of themeSubscriptions) stop();
+				themeSubscriptions.clear();
 				listeners.clear();
 				events.clear();
 				signal.removeEventListener("abort", dispose);
@@ -130,6 +136,24 @@ export function createDevelopmentHost({
 			views.add(view);
 			signal.addEventListener("abort", dispose, { once: true });
 			const host: LobsterViewContext["host"] = {
+				theme: {
+					get colorMode() {
+						assertActive();
+						return theme.colorMode;
+					},
+					subscribe(listener) {
+						assertActive();
+						const stop = theme.subscribe(() => {
+							if (!lifetime.signal.aborted) listener();
+						});
+						const unsubscribe = () => {
+							if (themeSubscriptions.delete(unsubscribe)) stop();
+						};
+						themeSubscriptions.add(unsubscribe);
+						if (lifetime.signal.aborted) unsubscribe();
+						return unsubscribe;
+					},
+				},
 				components: {
 					mountDialog(container, props) {
 						assertActive();

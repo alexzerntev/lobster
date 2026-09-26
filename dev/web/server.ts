@@ -11,6 +11,7 @@ if (process.env.NODE_ENV === "production") {
 const root = path.dirname(fileURLToPath(import.meta.url));
 const uiRoot = path.resolve(root, "../../ui");
 const workspace = path.resolve(process.env.LOBSTER_WORKSPACE ?? path.join(root, "workspace"));
+const port = Number(process.env.LOBSTER_WEB_PORT ?? 5180);
 const api = createWorkflowApi(workspace);
 const clients = new Set<ServerResponse>();
 let pendingChange: ReturnType<typeof setTimeout> | undefined;
@@ -21,18 +22,24 @@ const server = await createServer({
 	mode: "development",
 	publicDir: false,
 	root,
+	// A browser check can run alongside the developer's preview with different host assets.
+	cacheDir: path.join(root, "node_modules/.vite", String(port)),
+	optimizeDeps: { entries: ["index.html"] },
 	resolve: {
 		dedupe: ["react", "react-dom"],
 	},
 	server: {
 		host: process.env.LOBSTER_WEB_HOST ?? "127.0.0.1",
-		port: Number(process.env.LOBSTER_WEB_PORT ?? 5180),
+		port,
 		strictPort: true,
 		fs: {
 			allow: [root, uiRoot],
 		},
 	},
 	plugins: [
+		...(process.env.LOBSTER_OPENCLAW_ROOT
+			? [(await import("./theme-check/plugin.js")).createOpenClawThemeCheck()]
+			: []),
 		{
 			name: "lobster-development-api",
 			configureServer(vite) {

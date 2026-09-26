@@ -73,7 +73,20 @@ async function fixture(child = "nested/child.lobster") {
 	const get = vi.fn(async (id: string): Promise<LobsterWorkflowResult> => ({
 		workflow: detailFor(id),
 	}));
+	const themeListeners = new Set<() => void>();
+	let colorMode: "light" | "dark" = "light";
 	const host: LobsterViewContext["host"] = {
+		theme: {
+			get colorMode() {
+				return colorMode;
+			},
+			subscribe(listener) {
+				themeListeners.add(listener);
+				return () => {
+					themeListeners.delete(listener);
+				};
+			},
+		},
 		connection: { connected: true },
 		workflows: {
 			get,
@@ -139,6 +152,11 @@ async function fixture(child = "nested/child.lobster") {
 		controller,
 		events,
 		subscriptions,
+		themeListeners,
+		async theme(mode: "light" | "dark") {
+			colorMode = mode;
+			await act(async () => themeListeners.forEach((listener) => listener()));
+		},
 		add(detail: LobsterWorkflowDetail) {
 			children.set(detail.id, detail);
 		},
@@ -164,6 +182,40 @@ async function fixture(child = "nested/child.lobster") {
 }
 
 describe("subworkflow dialog", () => {
+	it("switches explicit host themes without remounting graphs or losing Code selection, and retires listeners", async () => {
+		const f = await fixture();
+		f.add(workflow("nested/child.lobster"));
+		const parentCanvas = f.container.querySelector(".react-flow");
+		for (let cycle = 0; cycle < 3; cycle++) {
+			await f.open();
+			const dialog = f.dialogs.at(-1)!;
+			const childCanvas = dialog.element.querySelector(".react-flow");
+			const code = Array.from(dialog.element.querySelectorAll("button")).find(
+				(button) => button.textContent === "Code",
+			)!;
+			await act(async () => code.click());
+			const source = dialog.element.querySelector("pre");
+			const reads = f.get.mock.calls.length;
+			for (const mode of ["dark", "light"] as const) {
+				await f.theme(mode);
+				expect(parentCanvas?.classList.contains(mode)).toBe(true);
+				expect(childCanvas?.classList.contains(mode)).toBe(true);
+				expect(f.container.querySelector(".react-flow")).toBe(parentCanvas);
+				expect(dialog.element.querySelector(".react-flow")).toBe(childCanvas);
+				expect(dialog.element.querySelector("pre")).toBe(source);
+				expect(code.getAttribute("aria-pressed")).toBe("true");
+				expect(f.get).toHaveBeenCalledTimes(reads);
+			}
+			expect(f.themeListeners.size).toBe(2);
+			await act(async () => dialog.props.onCancel());
+			expect(f.themeListeners.size).toBe(1);
+		}
+		await act(async () => f.controller.abort());
+		expect(f.themeListeners.size).toBe(0);
+		await f.theme("dark");
+		expect(f.container.childElementCount).toBe(0);
+	});
+
 	it("opens the referenced child from the actual card, preserves the parent, and releases child subscriptions", async () => {
 		const f = await fixture();
 		const child = workflow("nested/child.lobster");

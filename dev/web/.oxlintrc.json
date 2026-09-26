@@ -2,7 +2,7 @@
 	"extends": ["../../.oxlintrc.json"],
 	"overrides": [
 		{
-			"files": ["main.ts"],
+			"files": ["main.ts", "browser/**/*.ts", "theme-check/driver.ts"],
 			"env": {
 				"browser": true
 			}

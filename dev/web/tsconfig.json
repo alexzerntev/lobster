@@ -3,12 +3,20 @@
 		"target": "ES2022",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
-		"lib": ["ES2023", "DOM"],
+		"lib": ["ES2024", "DOM"],
 		"types": ["node", "vite/client"],
 		"strict": true,
 		"skipLibCheck": true,
 		"noEmit": true,
 		"allowImportingTsExtensions": true
 	},
-	"include": ["main.ts", "preview-host.ts", "preview-host.test.ts", "dialog.ts"]
+	"include": [
+		"main.ts",
+		"preview-host.ts",
+		"preview-host.test.ts",
+		"dialog.ts",
+		"browser/**/*.ts",
+		"theme-check/**/*.ts",
+		"playwright.config.ts"
+	]
 }

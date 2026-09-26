@@ -202,6 +202,7 @@ function WorkflowFlow({
 	const [failed, setFailed] = useState(false);
 	const flowElement = useRef<HTMLDivElement>(null);
 	const bounds = useRef<ReturnType<typeof layoutWorkflowGraph>["bounds"] | null>(null);
+	const fittedGraph = useRef<typeof graph | null>(null);
 	const labelMeasurements = useRef<HTMLDivElement>(null);
 	const [labelSizes, setLabelSizes] = useState(
 		new Map<string, { width: number; height: number }>(),
@@ -292,7 +293,10 @@ function WorkflowFlow({
 				setNodes(placed.nodes);
 				setEdges(placed.edges);
 				bounds.current = placed.bounds;
-				await fitWorkflow();
+				// Palette/font changes can require layout without discarding the user's viewport.
+				if (fittedGraph.current !== graph && (await fitWorkflow())) {
+					fittedGraph.current = graph;
+				}
 				if (!disposed) {
 					setReady(true);
 				}
@@ -465,7 +469,7 @@ function createWorkflowView(
 	let disposed = false;
 	let generation = 0;
 	let connected = host.connection.connected;
-	let colorMode: "light" | "dark" = "dark";
+	let colorMode = host.theme.colorMode;
 	let graph: ReturnType<typeof graphFor> | undefined;
 	let flowError: string | undefined;
 	let workflow: LobsterWorkflowDetail | undefined;
@@ -552,26 +556,21 @@ function createWorkflowView(
 		);
 	};
 	const syncTheme = () => {
-		const next = getComputedStyle(page).colorScheme === "light" ? "light" : "dark";
+		if (disposed || signal.aborted) return;
+		const next = host.theme.colorMode;
 		if (next !== colorMode) {
 			colorMode = next;
 			render();
 		}
 	};
 	const sizeView = () => {
-		syncTheme();
 		page.style.setProperty(
 			"--lobster-graph-top",
 			`${Math.max(0, page.getBoundingClientRect().top)}px`,
 		);
 	};
 	const resize = new ResizeObserver(sizeView);
-	// Palette loading can apply the root's color scheme after the host notification.
-	const themeObserver = new MutationObserver(syncTheme);
-	themeObserver.observe(document.documentElement, {
-		attributes: true,
-		attributeFilter: ["style", "data-theme-mode"],
-	});
+	const stopTheme = host.theme.subscribe(syncTheme);
 	resize.observe(page);
 	window.addEventListener("resize", sizeView, { signal });
 	sizeView();
@@ -673,7 +672,6 @@ function createWorkflowView(
 		);
 	}
 	const unsubscribe = host.subscribe(() => {
-		syncTheme();
 		if (connected !== host.connection.connected) {
 			connected = host.connection.connected;
 			if (!connected) {
@@ -695,7 +693,7 @@ function createWorkflowView(
 		changes.dispose();
 		unsubscribe();
 		resize.disconnect();
-		themeObserver.disconnect();
+		stopTheme();
 		source.dispose();
 		window.removeEventListener("resize", sizeView);
 		signal.removeEventListener("abort", dispose);

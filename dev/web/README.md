@@ -32,6 +32,32 @@ If port 5180 is occupied, stop the previous preview or set `LOBSTER_WEB_PORT`.
 Use `?theme=light` or `?theme=dark` to inspect themes (system preference by default),
 and `?host=offline` for the disconnected state.
 
+The viewer consumes `host.theme.colorMode` and `host.theme.subscribe`; hosts supply
+resolved light/dark state and inherited CSS tokens. `observeHostTheme(root, signal,
+subscribe?)` adapts an embedding root once per host lifetime, including late palette
+loads. Pass OpenClaw's `host.subscribe` as the optional notification source; abort
+the adapter with the host lifetime. Do not import the standalone theme stylesheet
+when embedding into OpenClaw, which owns its palette.
+
+Theme checks:
+
+```sh
+pnpm --filter @lobster/dev-web exec playwright install chromium --only-shell
+pnpm test:web:browser
+LOBSTER_OPENCLAW_ROOT=/path/to/openclaw pnpm test:theme:openclaw
+```
+
+The first suite exercises the real preview, computed colors, child dialogs, source
+selection, and viewport preservation; CI runs it on Node 24. The optional second
+suite loads the selected checkout's actual theme producer and palettes, including a
+delayed stylesheet. Only preferences and Gateway transport are synthetic; it does
+not test OpenClaw's full settings shell or plugin installation. Run it when changing
+the adapter or supported OpenClaw revision. Missing source contracts fail visibly.
+Normal `pnpm dev:web` still needs neither OpenClaw nor a browser install.
+The optional harness is enabled only by `LOBSTER_OPENCLAW_ROOT` and uses port 5192;
+normal development stays on 5180. Browser processes and the test server close after
+checks. The standalone palette copy is not automatically synchronized upstream.
+
 ## Ownership and maintenance
 
 - `ui/src/`: list, renderer, source explorer, input previews, and mount lifecycle.

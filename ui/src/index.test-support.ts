@@ -28,6 +28,7 @@ export async function createViewFixture(
 	};
 	const connection = { connected: true };
 	const host: LobsterViewContext["host"] = {
+		theme: { colorMode: "light", subscribe: () => () => {} },
 		errorMessage: workflowErrorMessage,
 		connection,
 		workflows,

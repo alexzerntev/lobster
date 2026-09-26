@@ -66,3 +66,11 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Install viewer test browser
+        if: matrix.node == 24
+        run: pnpm --filter @lobster/dev-web exec playwright install --with-deps chromium --only-shell
+
+      - name: Check live viewer themes
+        if: matrix.node == 24
+        run: pnpm test:web:browser
