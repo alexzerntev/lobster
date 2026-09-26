@@ -1,10 +1,3 @@
-/* Development viewport and native dialog geometry. */
-.shell.lobster-dev-host {
-	grid-template-columns: minmax(0, 1fr);
-	grid-template-rows: minmax(0, 1fr);
-	grid-template-areas: "content";
-}
-
 /* The host owns modal geometry; the embedded view owns the panel and contents. */
 .lobster-dev-dialog {
 	--lobster-modal-height-limit: var(--lobster-modal-max-height, calc(100dvh - 48px));

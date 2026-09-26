@@ -115,7 +115,7 @@ async function fixture(child = "nested/child.lobster") {
 				target.append(element);
 				const dispose = vi.fn(() => element.remove());
 				dialogs.push({ props, element, dispose });
-				return { update: () => {}, dispose };
+				return { dispose };
 			},
 		},
 	};

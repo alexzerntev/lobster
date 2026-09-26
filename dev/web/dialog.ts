@@ -6,7 +6,7 @@ type DialogProps = Parameters<MountDialog>[1];
 /** Native modal used by the development shell; the viewer owns its content. */
 export function mountDevelopmentDialog(
 	container: HTMLElement,
-	initial: DialogProps,
+	props: DialogProps,
 	signal: AbortSignal,
 ): ReturnType<MountDialog> {
 	signal.throwIfAborted();
@@ -15,26 +15,15 @@ export function mountDevelopmentDialog(
 	const ElementClass = document.defaultView?.HTMLElement;
 	const originalFocus =
 		ElementClass && document.activeElement instanceof ElementClass ? document.activeElement : null;
-	let props = initial;
 	let active = true;
 	let opened = false;
 	let backdropPress = false;
-	let returnFocusOverride: HTMLElement | null | undefined;
 	const restoreFocus = () => {
 		if (!opened) return;
 		opened = false;
-		const target = returnFocusOverride === undefined ? originalFocus : returnFocusOverride;
+		const target = props.returnFocusTarget === undefined ? originalFocus : props.returnFocusTarget;
 		if (target?.isConnected) target.focus({ preventScroll: true });
 		else if (target === null && document.activeElement === originalFocus) originalFocus?.blur();
-	};
-	const apply = () => {
-		dialog.className = `lobster-dev-dialog ${props.className ?? ""}`.trim();
-		dialog.style.cssText = props.style ?? "";
-		dialog.setAttribute("aria-label", props.label);
-		if (props.description) dialog.setAttribute("aria-description", props.description);
-		else dialog.removeAttribute("aria-description");
-		if (props.returnFocusTarget !== undefined) returnFocusOverride = props.returnFocusTarget;
-		if (dialog.firstChild !== props.content) dialog.replaceChildren(props.content);
 	};
 	const cancel = () => {
 		if (!active || !dialog.open) return;
@@ -81,7 +70,10 @@ export function mountDevelopmentDialog(
 	dialog.addEventListener("close", restoreFocus);
 	signal.addEventListener("abort", dispose, { once: true });
 	try {
-		apply();
+		dialog.className = "lobster-dev-dialog";
+		dialog.style.cssText = props.style ?? "";
+		dialog.setAttribute("aria-label", props.label);
+		dialog.append(props.content);
 		container.append(dialog);
 		dialog.showModal();
 		opened = true;
@@ -89,13 +81,5 @@ export function mountDevelopmentDialog(
 		dispose();
 		throw error;
 	}
-	return {
-		update(next) {
-			signal.throwIfAborted();
-			if (!active) throw new Error("This development dialog has been disposed.");
-			props = next;
-			apply();
-		},
-		dispose,
-	};
+	return { dispose };
 }

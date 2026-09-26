@@ -5,13 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import {
-	renderWorkflowGraph,
-	resolveWorkflowArgs,
-	type WorkflowFile,
-	type WorkflowGraph,
-	type WorkflowGraphNodeType,
-} from "../src/core/index.js";
+import { renderWorkflowGraph } from "../src/workflows/graph.js";
+import { resolveWorkflowArgs } from "../src/workflows/file.js";
+import type { WorkflowFile } from "../src/workflows/types.js";
+import type { WorkflowGraph, WorkflowGraphNodeType } from "../src/workflows/graph-types.js";
 
 function runCli(args: string[], env?: Record<string, string | undefined>) {
 	const bin = path.join(process.cwd(), "bin", "lobster.js");

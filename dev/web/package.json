@@ -6,8 +6,7 @@
 		"dev": "tsx watch --clear-screen=false server.ts",
 		"test": "tsx --test *.test.ts",
 		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-		"lint": "oxlint --config .oxlintrc.json --tsconfig tsconfig.json .",
-		"typecheck:server": "tsc -p tsconfig.server.json --noEmit"
+		"lint": "oxlint --config .oxlintrc.json --tsconfig tsconfig.json ."
 	},
 	"devDependencies": {
 		"@lobster/ui": "workspace:*",

@@ -11,8 +11,6 @@ export { WorkflowViewError, workflowErrorMessage } from "./workflow-errors.js";
 export type LobsterPageTarget = { id: string; params?: Readonly<Record<string, string>> };
 export type LobsterDialogProps = {
 	label: string;
-	description?: string;
-	className?: string;
 	style?: string;
 	content: HTMLElement;
 	returnFocusTarget?: HTMLElement | null;
@@ -26,7 +24,6 @@ export type LobsterViewContext = {
 				container: HTMLElement,
 				props: LobsterDialogProps,
 			) => {
-				update: (props: LobsterDialogProps) => void;
 				dispose: () => void;
 			};
 		};

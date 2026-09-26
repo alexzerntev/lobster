@@ -40,7 +40,7 @@ From this folder:
 
 - `pnpm test` compiles and runs engine tests against `dist/`, then the development API and viewer tests.
 - `bin/lobster.js` runs the compiled entrypoint in `dist/`; build after changing source files.
-  Invalid explicit workflow file paths are reported as input errors (exit code 2). In `--mode tool`, these failures use the same JSON error envelope as other parsing errors.
+Invalid explicit workflow file paths are reported as input errors (exit code 2). In `--mode tool`, these failures use the same JSON error envelope as other parsing errors.
 
 ## Process output limits
 
@@ -93,14 +93,14 @@ process tree before `run()` or `resume()` returns an error result containing the
 abort reason. A signal that is already aborted prevents the command from starting.
 
 ```js
-import { Lobster, exec } from "@clawdbot/lobster";
+import { Lobster, exec } from '@clawdbot/lobster';
 
 const controller = new AbortController();
 const pending = new Lobster({ signal: controller.signal })
-	.pipe(exec("node long-task.js", { json: false }))
-	.run();
+  .pipe(exec('node long-task.js', { json: false }))
+  .run();
 // When the host needs to stop the command:
-controller.abort(new Error("Host cancelled the command"));
+controller.abort(new Error('Host cancelled the command'));
 const result = await pending;
 ```
 
@@ -208,17 +208,6 @@ Format notes:
 - `dot`: emits Graphviz DOT syntax
 - `ascii`: emits a terminal-friendly node/edge list
 - `json`: emits the same graph as a JSON object with `nodes` and `edges`. Nodes contain the original `id`, `type`, `label`, and `shape`; edges contain `from`, `to`, and an optional `label`. IDs and labels are not escaped for Mermaid or DOT. Labels retain the literal `\n` separator used by the graph collector.
-
-JavaScript consumers can render the same graph without running the workflow:
-
-```js
-import { renderWorkflowGraph, resolveWorkflowArgs } from "@clawdbot/lobster/core";
-
-const args = resolveWorkflowArgs(workflow.args, {});
-const graph = JSON.parse(renderWorkflowGraph({ workflow, format: "json", args }));
-```
-
-Pass a parsed workflow object as `workflow`. The optional `args` supplies values for `${name}` substitutions in labels; the CLI resolves workflow argument defaults before rendering. JSON uses the existing step graph: pipelines, parallel groups, and loops remain single nodes.
 
 ## Calling LLMs from workflows
 
